@@ -4,7 +4,7 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { session } from '$lib/stores/session.svelte.js';
-	import { api } from '$lib/api.js';
+	import { api, setCsrf } from '$lib/api.js';
 
 	let { children } = $props();
 
@@ -13,6 +13,10 @@
 		try {
 			const me = await api('/api/auth/me');
 			session.user = me.user;
+			if (me.csrf_token) {
+				setCsrf(me.csrf_token);
+				session.csrf = me.csrf_token;
+			}
 		} catch (e) {
 			/* not logged in */
 		}

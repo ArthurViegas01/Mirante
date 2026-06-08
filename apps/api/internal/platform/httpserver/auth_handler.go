@@ -100,8 +100,13 @@ func (h *AuthHandlers) Me(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthenticated", "login required")
 		return
 	}
+	csrf := ""
+	if sess, ok := SessionFrom(r.Context()); ok {
+		csrf = sess.CSRFToken
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"user": map[string]string{"id": u.ID, "email": u.Email, "name": u.Name},
+		"user":       map[string]string{"id": u.ID, "email": u.Email, "name": u.Name},
+		"csrf_token": csrf,
 	})
 }
 

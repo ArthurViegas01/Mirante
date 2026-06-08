@@ -1,5 +1,72 @@
 <script>
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import Button from '$lib/components/Button.svelte';
+	import Input from '$lib/components/Input.svelte';
+	import Select from '$lib/components/Select.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import { api } from '$lib/api.js';
+	import { STATUS, STATUS_OPTIONS, VIS_OPTIONS } from '$lib/projectStatus.js';
+
+	let projects = $state([]);
+	let loading = $state(true);
+	let error = $state('');
+	let showForm = $state(false);
+
+	let nome = $state('');
+	let codinome = $state('');
+	let descricao = $state('');
+	let repo = $state('');
+	let status = $state('ideia');
+	let visibilidade = $state('pessoal');
+	let tagsText = $state('');
+	let saving = $state(false);
+	let formError = $state('');
+
+	async function load() {
+		loading = true;
+		error = '';
+		try {
+			const res = await api('/api/projects');
+			projects = res.projects;
+		} catch (e) {
+			error = e.message;
+		} finally {
+			loading = false;
+		}
+	}
+
+	onMount(load);
+
+	function resetForm() {
+		nome = codinome = descricao = repo = tagsText = '';
+		status = 'ideia';
+		visibilidade = 'pessoal';
+		formError = '';
+	}
+
+	async function create(e) {
+		e.preventDefault();
+		saving = true;
+		formError = '';
+		try {
+			const tags = tagsText
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean);
+			await api('/api/projects', {
+				method: 'POST',
+				body: { nome, codinome, descricao, repo, status, visibilidade, tags }
+			});
+			showForm = false;
+			resetForm();
+			await load();
+		} catch (e) {
+			formError = e.message;
+		} finally {
+			saving = false;
+		}
+	}
 </script>
 
 <header class="page-head">
@@ -7,9 +74,67 @@
 		<p class="eyebrow">Projetos</p>
 		<h1>Projetos</h1>
 	</div>
-	<StatusBadge status="info" label="Em breve — F1" />
+	<Button onclick={() => (showForm = !showForm)}>{showForm ? 'Cancelar' : 'Novo projeto'}</Button>
 </header>
-<p class="muted">O cadastro central dos seus projetos — a espinha de tudo — vai morar aqui.</p>
+
+{#if showForm}
+	<form class="panel form" onsubmit={create}>
+		<div class="grid">
+			<Input label="Nome" bind:value={nome} required />
+			<Input label="Codinome" bind:value={codinome} />
+			<Select label="Status" bind:value={status} options={STATUS_OPTIONS} />
+			<Select label="Visibilidade" bind:value={visibilidade} options={VIS_OPTIONS} />
+			<Input label="Repo" bind:value={repo} placeholder="https://github.com/…" />
+			<Input label="Tags (vírgula)" bind:value={tagsText} placeholder="Go, SvelteKit" />
+		</div>
+		<Input label="Descrição" bind:value={descricao} />
+		{#if formError}<p class="error">{formError}</p>{/if}
+		<div class="actions">
+			<Button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Criar projeto'}</Button>
+		</div>
+	</form>
+{/if}
+
+{#if loading}
+	<p class="muted">Carregando…</p>
+{:else if error}
+	<p class="error">{error}</p>
+{:else if projects.length === 0}
+	<div class="panel empty">Nenhum projeto ainda. Crie o primeiro.</div>
+{:else}
+	<div class="table-wrap">
+		<table>
+			<thead>
+				<tr>
+					<th>Projeto</th>
+					<th>Status</th>
+					<th>Stack</th>
+					<th>Visibilidade</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each projects as p (p.id)}
+					<tr onclick={() => goto(`/projetos/${p.id}`)}>
+						<td class="name">
+							<span class="primary">{p.nome}</span>
+							{#if p.codinome}<span class="meta">{p.codinome}</span>{/if}
+						</td>
+						<td>
+							<StatusBadge
+								status={STATUS[p.status]?.variant ?? 'info'}
+								label={STATUS[p.status]?.label ?? p.status}
+							/>
+						</td>
+						<td class="tags">
+							{#each p.tags as t (t)}<span class="tag">{t}</span>{/each}
+						</td>
+						<td class="vis">{p.visibilidade}</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+{/if}
 
 <style>
 	.page-head {
@@ -17,7 +142,7 @@
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: var(--space-4);
-		margin-bottom: var(--space-4);
+		margin-bottom: var(--space-6);
 	}
 	.eyebrow {
 		font-family: var(--font-mono);
@@ -36,6 +161,101 @@
 	}
 	.muted {
 		color: var(--color-text-secondary);
-		font-size: var(--text-base);
+	}
+	.error {
+		color: var(--color-danger-text);
+		font-size: var(--text-sm);
+	}
+	.panel {
+		background-color: var(--color-surface);
+		border: var(--border-width-1) solid var(--color-border);
+		border-radius: var(--radius-lg);
+		box-shadow: var(--shadow-sm);
+	}
+	.form {
+		padding: var(--space-6);
+		margin-bottom: var(--space-6);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+	}
+	.grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: var(--space-4);
+	}
+	.actions {
+		display: flex;
+		justify-content: flex-end;
+	}
+	.empty {
+		padding: var(--space-8);
+		text-align: center;
+		color: var(--color-text-muted);
+	}
+	.table-wrap {
+		background-color: var(--color-surface);
+		border: var(--border-width-1) solid var(--color-border);
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+	}
+	table {
+		width: 100%;
+		border-collapse: collapse;
+	}
+	th {
+		text-align: left;
+		background-color: var(--vapor);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-text-muted);
+		font-weight: var(--weight-medium);
+		padding: 11px 18px;
+		border-bottom: var(--border-width-1) solid var(--color-border);
+	}
+	td {
+		padding: 14px 18px;
+		font-size: 13.5px;
+		color: var(--color-text);
+		border-bottom: var(--border-width-1) solid var(--color-divider);
+	}
+	tbody tr {
+		cursor: pointer;
+		transition: background-color var(--dur-fast) var(--ease-out);
+	}
+	tbody tr:hover {
+		background-color: var(--vapor);
+	}
+	tbody tr:last-child td {
+		border-bottom: none;
+	}
+	.name .primary {
+		font-weight: var(--weight-semibold);
+	}
+	.name .meta {
+		display: block;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--color-text-muted);
+		margin-top: 2px;
+	}
+	.tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+	.tag {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		padding: 2px 7px;
+		border-radius: var(--radius-full);
+		background-color: var(--color-divider);
+		color: var(--color-text-secondary);
+	}
+	.vis {
+		color: var(--color-text-muted);
+		text-transform: capitalize;
 	}
 </style>
