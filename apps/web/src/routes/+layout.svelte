@@ -3,8 +3,11 @@
 	import { onMount } from 'svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import NotificationCenter from '$lib/components/NotificationCenter.svelte';
 	import { session } from '$lib/stores/session.svelte.js';
 	import { api, setCsrf } from '$lib/api.js';
+	import { connectMonitorStream } from '$lib/sse.js';
+	import { monitor } from '$lib/stores/monitor.svelte.js';
 
 	let { children } = $props();
 
@@ -17,6 +20,8 @@
 				setCsrf(me.csrf_token);
 				session.csrf = me.csrf_token;
 			}
+			connectMonitorStream();
+			monitor.loadAlerts().catch(() => {});
 		} catch (e) {
 			/* not logged in */
 		}
@@ -27,6 +32,7 @@
 	<Sidebar />
 	<div class="main">
 		<header class="topbar">
+			<NotificationCenter />
 			<ThemeToggle />
 		</header>
 		<main class="content">
@@ -51,6 +57,7 @@
 		display: flex;
 		justify-content: flex-end;
 		align-items: center;
+		gap: var(--space-3);
 		padding: var(--space-4) var(--space-6);
 		border-bottom: var(--border-width-1) solid var(--color-divider);
 	}

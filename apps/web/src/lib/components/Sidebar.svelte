@@ -1,5 +1,6 @@
 <script>
 	import { page } from '$app/stores';
+	import { monitor } from '$lib/stores/monitor.svelte.js';
 
 	const items = [
 		{
@@ -35,7 +36,12 @@
 		</svg>
 		<span class="wordmark">mirante</span>
 		<span class="tag">MIRANTE</span>
-		<span class="live" title="Tempo real" aria-label="Indicador ao vivo"></span>
+		<span
+			class="live"
+			class:on={monitor.connected}
+			title={monitor.connected ? 'Ao vivo' : 'Offline'}
+			aria-label="Indicador ao vivo"
+		></span>
 	</div>
 
 	<ul class="nav">
@@ -104,8 +110,21 @@
 		height: 7px;
 		margin-left: auto;
 		border-radius: var(--radius-full);
+		background-color: rgba(255, 255, 255, 0.25);
+	}
+	.live.on {
 		background-color: var(--color-live);
 		box-shadow: 0 0 0 4px var(--color-live-halo);
+		animation: live-pulse 2.4s var(--ease-in-out) infinite;
+	}
+	@keyframes live-pulse {
+		0%,
+		100% {
+			box-shadow: 0 0 0 3px var(--color-live-halo);
+		}
+		50% {
+			box-shadow: 0 0 0 7px color-mix(in srgb, var(--glow) 8%, transparent);
+		}
 	}
 
 	.nav {
