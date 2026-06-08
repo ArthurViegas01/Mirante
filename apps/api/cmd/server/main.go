@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lumni/mirante/internal/monitor"
 	"github.com/lumni/mirante/internal/platform/auth"
 	"github.com/lumni/mirante/internal/platform/config"
 	"github.com/lumni/mirante/internal/platform/db"
@@ -19,6 +20,7 @@ import (
 	"github.com/lumni/mirante/internal/platform/migrate"
 	"github.com/lumni/mirante/internal/platform/otel"
 	"github.com/lumni/mirante/internal/platform/ratelimit"
+	"github.com/lumni/mirante/internal/platform/sse"
 	"github.com/lumni/mirante/internal/projects"
 )
 
@@ -74,6 +76,24 @@ func run() error {
 	projectsSvc := projects.NewService(projects.NewSQLiteRepo(database))
 	projects.RegisterRoutes(mux, authH.Protect, projectsSvc)
 
+	monitorRepo := monitor.NewSQLiteRepo(database)
+	monitorMgr := monitor.NewManager(monitorRepo)
+	hub := sse.NewHub(func(ctx context.Context, afterID int64, limit int) ([]sse.Event, error) {
+		evs, err := monitorRepo.EventsAfter(ctx, afterID, limit)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]sse.Event, len(evs))
+		for i, e := range evs {
+			out[i] = sse.Event{ID: e.ID, Type: e.Type, Data: e.Data}
+		}
+		return out, nil
+	})
+	monitorEngine := monitor.NewEngine(monitorRepo, monitor.NewChecker(), monitor.NewNotifier(log), hub, log)
+	monitorSched := monitor.NewScheduler(monitorRepo, monitorEngine, log, 8)
+	monitor.RegisterRoutes(mux, authH.Protect, monitorMgr)
+	mux.Handle("GET /api/stream/monitor", authH.RequireAuth(hub))
+
 	ipLimiter := ratelimit.New(240, time.Minute)
 	handler := httpserver.Chain(mux,
 		httpserver.RequestID(),
@@ -109,6 +129,9 @@ func run() error {
 		}
 	}()
 
+	monitorSched.Start(ctx)
+	log.Info("monitor scheduler started")
+
 	errCh := make(chan error, 1)
 	go func() {
 		log.Info("api listening", "addr", cfg.HTTPAddr)
@@ -125,6 +148,7 @@ func run() error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		err := srv.Shutdown(shutdownCtx)
+		monitorSched.Stop()
 		<-sweepDone
 		return err
 	}
