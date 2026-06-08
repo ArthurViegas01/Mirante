@@ -10,8 +10,31 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### A fazer
-- F1 — Projetos + Monitor (a vitrine real-time): scheduler concorrente, estado
-  derivado com anti-flap, histórico/uptime, alertas in-app e push SSE.
+- F2 — Tarefas (vínculo a projeto e, depois, a vagas).
+
+## [0.3.0] - 2026-06-08
+
+F1 — Projetos + Monitor: o cadastro central e a vitrine real-time.
+
+### Adicionado
+- **Projetos:** domínio completo (CRUD, links, tags, archive vs delete) com REST
+  em `/api/projects` e UI (data table, criar, project view).
+- **Monitor:** migração `0003` (services, check_results, alerts, events outbox);
+  `Derive()` puro table-tested (anti-flap N, recovery K, degraded vs timeout,
+  wrong-code → down); checkers HTTP/TCP/db_ping via `SafeFetcher` (política-monitor);
+  scheduler concorrente (registry de `CancelFunc`, worker pool, single-flight,
+  reconcile sob demanda, shutdown sem leak via goleak); alert layer com interface
+  `Notifier` (canais externos pluggáveis, nenhum no v1); escrita atômica
+  check+alert+event.
+- **SSE:** hub com sequência durável (id do outbox), replay por `Last-Event-ID`,
+  drop de cliente lento, cap de conexões; `GET /api/stream/monitor`.
+- **UI do Monitor:** board com status badges ao vivo, sparkline com ponto Glow,
+  uptime (24h/7d/30d), centro de notificações e indicador "ao vivo" ligado ao SSE.
+- Refactor de composição: `cmd/server` é o composition root e `platform` não
+  importa domínios (ADR-0001); pacote `respond`; `/api/auth/me` devolve o CSRF.
+
+### Notas
+- Uptime é computado direto de `check_results` no v1; rollups/pruning ficam para a F5.
 
 ## [0.2.0] - 2026-06-07
 
@@ -60,6 +83,7 @@ estrutura e artefatos de fundação.
   assinatura **Glow** (`#5EEAD4`) dos elementos "ao vivo" (`--color-live*`).
 - `README.md` (esqueleto) e este `CHANGELOG.md`.
 
-[Não lançado]: https://example.com/mirante/compare/v0.2.0...HEAD
+[Não lançado]: https://example.com/mirante/compare/v0.3.0...HEAD
+[0.3.0]: https://example.com/mirante/compare/v0.2.0...v0.3.0
 [0.2.0]: https://example.com/mirante/compare/v0.1.0...v0.2.0
 [0.1.0]: https://example.com/mirante/releases/tag/v0.1.0
