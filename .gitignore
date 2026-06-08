@@ -1,0 +1,32 @@
+# Go
+/apps/api/bin/
+*.test
+*.out
+coverage*.txt
+
+# Node / SvelteKit
+node_modules/
+/apps/web/.svelte-kit/
+/apps/web/build/
+/apps/web/.vercel/
+/apps/web/.output/
+/apps/web/vite.config.*.timestamp-*
+
+# Env & secrets
+.env
+.env.local
+*.local
+
+# Data / DB
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
