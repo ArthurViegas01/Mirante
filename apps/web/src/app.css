@@ -1,0 +1,353 @@
+/* ============================================================
+   MIRANTE — GLOBAL STYLESHEET
+   Lumni Design System tokens (source of truth:
+   docs/design/lumni-design-system.md, §8).
+
+   Light  = :root
+   Dark   = [data-theme="dark"]
+   Components wire to ROLE tokens only (--color-*, --space-*,
+   --radius-*, --shadow-*, --font-*, --ease-*) — never raw hex,
+   never the raw ramps.
+
+   Mirante does NOT diverge the Lumni palette. Its only signature
+   is Glow (#5EEAD4) on "live"/real-time elements — see the
+   MIRANTE real-time block below.
+   ============================================================ */
+
+/* ============================================================
+   FONTS — self-hosted (drop files in apps/web/static/fonts/).
+   Figtree (sans, variable), Instrument Serif (serif, 400 + italic),
+   Geist Mono (mono, variable). font-display: swap to avoid FOIT.
+   ============================================================ */
+@font-face {
+  font-family: "Figtree";
+  src: url("/fonts/figtree-variable.woff2") format("woff2-variations");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/instrument-serif-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/instrument-serif-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist-mono-variable.woff2") format("woff2-variations");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ============================================================
+   LUMNI DESIGN SYSTEM — TOKENS
+   Raw ramps are theme-independent; role tokens flip per theme.
+   ============================================================ */
+:root {
+  /* ---------- BRAND RAMPS (theme-independent) ---------- */
+  --beam-50:  #ECFDF5;
+  --beam-100: #D1FAF0;
+  --beam-200: #A7F3DD;
+  --beam-300: #6FE7CB;
+  --beam-400: #34D3B3;
+  --beam-500: #14B8A6;   /* Tide */
+  --beam-600: #0F8E83;
+  --beam-700: #0F766E;   /* Beam */
+  --beam-800: #115E59;
+  --beam-900: #134E4A;
+  --beam-950: #042F2E;
+  --glow:     #5EEAD4;
+
+  --ink-50:  #F7F9FA;
+  --ink-100: #EEF2F4;
+  --ink-200: #DCE3E8;
+  --ink-300: #C0CAD2;
+  --ink-400: #94A3AE;
+  --ink-500: #6B7A86;
+  --ink-600: #4B5A66;
+  --ink-700: #334452;
+  --ink-800: #1F2D3A;
+  --ink-900: #0F1B27;
+  --ink-950: #0B1622;
+
+  --frost: #FFFFFF;
+  --mist:  #F4F7F8;
+  --vapor: #FAFBFC;
+
+  /* ---------- SEMANTIC STATUS (light) ---------- */
+  --color-success:      #16A34A;
+  --color-success-bg:   #DCFCE7;
+  --color-success-text: #15803D;
+  --color-warning:      #D97706;
+  --color-warning-bg:   #FEF3C7;
+  --color-warning-text: #92400E;
+  --color-danger:       #DC2626;
+  --color-danger-bg:    #FEE2E2;
+  --color-danger-text:  #991B1B;
+  --color-info:         #2563EB;
+  --color-info-bg:      #DBEAFE;
+  --color-info-text:    #1E3A8A;
+
+  /* ---------- CHART PALETTE ---------- */
+  --chart-1: #0F766E;
+  --chart-2: #14B8A6;
+  --chart-3: #60A5FA;
+  --chart-4: #F59E0B;
+  --chart-5: #8B5CF6;
+  --chart-6: #5EEAD4;   /* Glow — highlight / "live" point */
+  --chart-grid:     #EEF2F4;
+  --chart-baseline: rgba(220, 227, 232, 0.5);
+
+  /* ---------- ROLE TOKENS (light) ---------- */
+  --color-bg:               var(--mist);
+  --color-surface:          var(--frost);
+  --color-surface-elevated: var(--frost);
+  --color-border:           var(--ink-200);
+  --color-border-strong:    var(--ink-300);
+  --color-divider:          var(--ink-100);
+  --color-text:             var(--ink-950);
+  --color-text-secondary:   var(--ink-700);
+  --color-text-muted:       var(--ink-500);
+  --color-text-disabled:    var(--ink-400);
+  --color-primary:          var(--beam-700);
+  --color-primary-hover:    var(--beam-800);
+  --color-primary-active:   var(--beam-900);
+  --color-primary-text:     #FFFFFF;
+  --color-accent:           var(--beam-500);
+  --color-link:             var(--beam-700);
+  --color-link-hover:       var(--beam-800);
+  --color-focus-ring:       rgba(20, 184, 166, 0.24);
+
+  /* ---------- MIRANTE — real-time "live" signature (Glow) ----------
+     Glow is the Mirante signature for ao-vivo elements: the live
+     sparkline point + halo, the SSE/connection indicator, the
+     pulsing status dot on a service that just transitioned.
+     Use as a DOT / halo / ring / accent — never as text on light
+     surfaces (Glow on Mist fails contrast). On dark, Glow is also a
+     legible accent/link (≈11:1 on Ink-950). */
+  --color-live:        var(--glow);
+  --color-live-halo:   color-mix(in srgb, var(--glow) 20%, transparent);
+  --color-live-strong: var(--beam-400);
+
+  /* ---------- TYPOGRAPHY ---------- */
+  --font-sans:  "Figtree", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-mono:  "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-display: 5.25rem;   /* 84px */
+  --text-4xl: 3rem;          /* 48px  H1 */
+  --text-3xl: 2.375rem;      /* 38px  H2 */
+  --text-2xl: 1.875rem;      /* 30px  H3 */
+  --text-xl:  1.5rem;        /* 24px  H4 */
+  --text-lg:  1.25rem;       /* 20px */
+  --text-md:  1.0625rem;     /* 17px  lead */
+  --text-base: 0.9375rem;    /* 15px  body */
+  --text-sm:  0.8125rem;     /* 13px  small */
+  --text-xs:  0.75rem;       /* 12px  caption/eyebrow */
+
+  --leading-tight:   1.1;
+  --leading-snug:    1.25;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.65;
+  --leading-display: 1.02;
+
+  --tracking-display: -0.03em;
+  --tracking-tight:   -0.02em;
+  --tracking-snug:    -0.01em;
+  --tracking-normal:  0;
+  --tracking-wide:    0.04em;
+  --tracking-eyebrow: 0.12em;
+
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ---------- SPACING (4px grid) ---------- */
+  --space-1:  0.25rem;   /* 4   */
+  --space-2:  0.5rem;    /* 8   */
+  --space-3:  0.75rem;   /* 12  */
+  --space-4:  1rem;      /* 16  */
+  --space-5:  1.25rem;   /* 20  */
+  --space-6:  1.5rem;    /* 24  */
+  --space-8:  2rem;      /* 32  */
+  --space-10: 2.5rem;    /* 40  */
+  --space-12: 3rem;      /* 48  */
+  --space-16: 4rem;      /* 64  */
+  --space-20: 5rem;      /* 80  */
+  --space-24: 6rem;      /* 96  */
+  --space-32: 8rem;      /* 128 */
+
+  /* ---------- RADIUS ---------- */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-2xl:  24px;
+  --radius-full: 9999px;
+
+  /* ---------- BORDER WIDTH ---------- */
+  --border-width-1:     1px;
+  --border-width-2:     2px;
+  --border-width-focus: 3px;
+
+  /* ---------- ELEVATION (cool-tinted) ---------- */
+  --shadow-xs: 0 1px 2px 0 rgba(15,27,39,.04);
+  --shadow-sm: 0 1px 3px 0 rgba(15,27,39,.06), 0 1px 2px -1px rgba(15,27,39,.04);
+  --shadow-md: 0 4px 8px -2px rgba(15,27,39,.06), 0 2px 4px -2px rgba(15,27,39,.04);
+  --shadow-lg: 0 12px 24px -6px rgba(15,27,39,.08), 0 4px 8px -4px rgba(15,27,39,.04);
+  --shadow-xl: 0 24px 48px -12px rgba(15,27,39,.12);
+  --shadow-inner: inset 0 1px 0 0 rgba(255,255,255,.6);
+  --shadow-focus: 0 0 0 3px var(--color-focus-ring);
+
+  /* ---------- MOTION ---------- */
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-instant: 80ms;
+  --dur-fast:    160ms;
+  --dur-base:    240ms;
+  --dur-slow:    400ms;
+
+  /* ---------- LAYOUT ---------- */
+  --max-content: 1200px;
+  --max-canvas:  1440px;
+  --max-prose:   680px;
+  --gutter:      24px;
+
+  /* sidebar (component metric promoted to a layout token) */
+  --sidebar-width: 232px;
+
+  color-scheme: light;
+}
+
+/* ============================================================
+   DARK THEME — role tokens flip; ramps/scale stay constant
+   ============================================================ */
+[data-theme="dark"] {
+  --color-bg:               var(--ink-950);
+  --color-surface:          var(--ink-900);
+  --color-surface-elevated: var(--ink-800);
+  --color-border:           rgba(255,255,255,0.08);
+  --color-border-strong:    var(--ink-700);
+  --color-divider:          rgba(255,255,255,0.05);
+  --color-text:             var(--ink-50);
+  --color-text-secondary:   rgba(255,255,255,0.72);
+  --color-text-muted:       var(--ink-400);
+  --color-text-disabled:    rgba(255,255,255,0.40);
+
+  --color-primary:          var(--beam-400);
+  --color-primary-hover:    var(--beam-300);
+  --color-primary-active:   var(--glow);
+  --color-primary-text:     var(--ink-950);   /* dark text on light teal */
+  --color-accent:           var(--glow);
+  --color-link:             var(--glow);
+  --color-link-hover:       var(--beam-300);
+  --color-focus-ring:       rgba(20, 184, 166, 0.40);
+
+  /* status — lightened for legibility on dark */
+  --color-success:      #4ADE80;
+  --color-success-bg:   rgba(74,222,128,0.14);
+  --color-success-text: #4ADE80;
+  --color-warning:      #FBBF24;
+  --color-warning-bg:   rgba(251,191,36,0.14);
+  --color-warning-text: #FBBF24;
+  --color-danger:       #F87171;
+  --color-danger-bg:    rgba(248,113,113,0.14);
+  --color-danger-text:  #F87171;
+  --color-info:         #60A5FA;
+  --color-info-bg:      rgba(96,165,250,0.14);
+  --color-info-text:    #60A5FA;
+
+  /* chart grid/baseline for dark */
+  --chart-grid:     rgba(255,255,255,0.06);
+  --chart-baseline: rgba(255,255,255,0.08);
+
+  /* live signature stays Glow on dark (legible accent) */
+  --color-live-halo: color-mix(in srgb, var(--glow) 26%, transparent);
+
+  /* elevation: prefer background-step separation; soften shadows */
+  --shadow-sm: 0 1px 3px 0 rgba(0,0,0,.4);
+  --shadow-md: 0 4px 8px -2px rgba(0,0,0,.45);
+  --shadow-lg: 0 12px 24px -6px rgba(0,0,0,.5);
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+   BASE LAYER — minimal, wires the document to role tokens.
+   (Components live elsewhere; this only sets sane document defaults.)
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  font-weight: var(--weight-regular);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular figures wherever numerals are compared (tables, KPIs, charts). */
+.tnum,
+[data-tnum] {
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Focus is non-negotiable: 3px Tide ring on keyboard focus, never suppressed. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  border-radius: var(--radius-xs);
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+
+a {
+  color: var(--color-link);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--color-link-hover);
+}
+
+/* ============================================================
+   ACCESSIBILITY — clamp all motion when the user asks for less.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
