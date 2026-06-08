@@ -1,0 +1,6 @@
+Dockerfile
+.dockerignore
+bin/
+data/
+*.db
+*.db-*
