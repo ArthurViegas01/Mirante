@@ -10,7 +10,41 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### A fazer
-- F2 — Tarefas (vínculo a projeto e, depois, a vagas).
+- F3 — Vagas/CV/CRM/Export (skills, LLM, ingest de vaga, tailoring de CV); inclui a
+  migração que adiciona `tasks.job_id` FK→jobs.
+
+## [0.4.0] - 2026-06-08
+
+F2 — Tarefas: o quadro de atividades, vinculável a projetos.
+
+### Adicionado
+- **Tarefas:** domínio completo (`internal/tasks`) seguindo a anatomia da ADR-0001
+  (types/repo/sqlite/service/http, ID tipado) — CRUD com status
+  (a_fazer/fazendo/feito), prioridade (baixa/media/alta), prazo (data nullable) e
+  tags (reusa a tabela `tags`); REST em `/api/tasks` com filtros por projeto, status
+  e prioridade.
+- **Migração `0004`:** tabela `tasks` + join `task_tags`. `project_id` é FK→projects
+  nullable com `ON DELETE SET NULL` (excluir um projeto desvincula as tarefas em vez
+  de apagá-las); `job_id` é nullable e **sem** FK ainda (a constraint FK→jobs entra
+  numa migração da F3).
+- **UI:** página `/tarefas` reconstruída como quadro kanban (três colunas por status,
+  avançar/retroceder, filtro por projeto via `?project=`, formulário de criação com
+  prazo e tags, destaque de prazo vencido); seção "Tarefas abertas" e link para o
+  quadro na project view.
+
+### Corrigido
+- **Guard de autenticação no SPA:** o layout raiz agora redireciona visitantes
+  deslogados para `/login` (tela isolada, sem sidebar) em vez de renderizar páginas
+  protegidas com erro cru; logado, sai de `/login` para `/projetos`. O stream do
+  monitor conecta de forma reativa ao autenticar (sem precisar recarregar).
+- **`api.js` robusto a respostas não-JSON:** corpos texto/HTML (404/502, erro de
+  proxy) viram uma mensagem limpa em vez de estourar `JSON.parse`.
+
+### Notas
+- Validação determinística no serviço (titulo obrigatório ≤200, status/prioridade por
+  enum, prazo ISO `YYYY-MM-DD`); integridade cross-domain garantida por FK no banco,
+  como no monitor (ADR-0001). Verificado com smoke real ponta a ponta (login → CSRF →
+  projeto → tarefa → filtros → mover → validação → delete) contra libSQL.
 
 ## [0.3.0] - 2026-06-08
 
@@ -83,7 +117,8 @@ estrutura e artefatos de fundação.
   assinatura **Glow** (`#5EEAD4`) dos elementos "ao vivo" (`--color-live*`).
 - `README.md` (esqueleto) e este `CHANGELOG.md`.
 
-[Não lançado]: https://example.com/mirante/compare/v0.3.0...HEAD
+[Não lançado]: https://example.com/mirante/compare/v0.4.0...HEAD
+[0.4.0]: https://example.com/mirante/compare/v0.3.0...v0.4.0
 [0.3.0]: https://example.com/mirante/compare/v0.2.0...v0.3.0
 [0.2.0]: https://example.com/mirante/compare/v0.1.0...v0.2.0
 [0.1.0]: https://example.com/mirante/releases/tag/v0.1.0

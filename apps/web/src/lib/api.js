@@ -24,7 +24,16 @@ export async function api(path, { method = 'GET', body } = {}) {
 	});
 
 	const text = await res.text();
-	const data = text ? JSON.parse(text) : null;
+	let data = null;
+	if (text) {
+		try {
+			data = JSON.parse(text);
+		} catch {
+			// Non-JSON body — a plaintext 404/502, an HTML error page, or a proxy
+			// error. Surface a clean message instead of leaking a JSON.parse throw.
+			throw new Error(res.statusText || `request failed (${res.status})`);
+		}
+	}
 
 	if (!res.ok) {
 		const message = data?.error?.message || res.statusText || 'request failed';

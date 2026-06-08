@@ -7,13 +7,19 @@
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import { api } from '$lib/api.js';
 	import { STATUS, STATUS_OPTIONS, LINK_KINDS } from '$lib/projectStatus.js';
+	import { STATUS as TASK_STATUS, PRIORIDADE, fmtPrazo, isOverdue, isOpen } from '$lib/taskMeta.js';
+
+	const today = new Date().toISOString().slice(0, 10);
 
 	let id = $derived($page.params.id);
 
 	let project = $state(null);
+	let tasks = $state([]);
 	let loading = $state(true);
 	let error = $state('');
 	let status = $state('');
+
+	let openTasks = $derived(tasks.filter(isOpen));
 
 	let linkLabel = $state('');
 	let linkUrl = $state('');
@@ -26,6 +32,8 @@
 		try {
 			project = await api(`/api/projects/${pid}`);
 			status = project.status;
+			const tr = await api(`/api/tasks?project_id=${encodeURIComponent(pid)}`);
+			tasks = tr.tasks;
 		} catch (e) {
 			error = e.message;
 		} finally {
@@ -68,7 +76,12 @@
 	}
 
 	async function remove() {
-		if (!confirm('Excluir este projeto? Os serviços do monitor vão junto.')) return;
+		if (
+			!confirm(
+				'Excluir este projeto? Os serviços do monitor vão junto; as tarefas serão desvinculadas.'
+			)
+		)
+			return;
 		await api(`/api/projects/${id}`, { method: 'DELETE' });
 		goto('/projetos');
 	}
@@ -135,6 +148,29 @@
 			<div class="link-submit"><Button type="submit" size="sm">Adicionar</Button></div>
 		</form>
 		{#if linkError}<p class="error">{linkError}</p>{/if}
+	</section>
+
+	<section class="panel">
+		<div class="panel-head">
+			<h2>Tarefas abertas</h2>
+			<a class="quadro" href={`/tarefas?project=${id}`}>Ver no quadro →</a>
+		</div>
+		{#if openTasks.length}
+			<ul class="tasks">
+				{#each openTasks as t (t.id)}
+					<li>
+						<span class="t-titulo">{t.titulo}</span>
+						<StatusBadge status={PRIORIDADE[t.prioridade].variant} label={PRIORIDADE[t.prioridade].label} />
+						<StatusBadge status={TASK_STATUS[t.status].variant} label={TASK_STATUS[t.status].label} />
+						{#if t.prazo}
+							<span class="t-prazo" class:overdue={isOverdue(t, today)}>⏷ {fmtPrazo(t.prazo)}</span>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<p class="muted">Nenhuma tarefa aberta.</p>
+		{/if}
 	</section>
 
 	<section class="danger-zone">
@@ -276,6 +312,49 @@
 	}
 	.danger-zone {
 		margin-top: var(--space-8);
+	}
+	.panel-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-4);
+		margin-bottom: var(--space-4);
+	}
+	.panel-head h2 {
+		margin: 0;
+	}
+	.quadro {
+		font-size: var(--text-sm);
+		color: var(--color-link);
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	.tasks {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+	.tasks li {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		font-size: var(--text-sm);
+	}
+	.t-titulo {
+		flex: 1;
+		color: var(--color-text);
+	}
+	.t-prazo {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--color-text-muted);
+	}
+	.t-prazo.overdue {
+		color: var(--color-danger-text);
+		font-weight: var(--weight-semibold);
 	}
 	@media (max-width: 640px) {
 		.link-form {
