@@ -22,7 +22,8 @@ type Scheduler struct {
 	log           *slog.Logger
 	reconcileEach time.Duration
 
-	sem chan struct{}
+	sem     chan struct{}
+	trigger chan struct{}
 
 	mu      sync.Mutex
 	running map[ServiceID]*serviceLoop
@@ -42,7 +43,17 @@ func NewScheduler(repo Repository, engine *Engine, log *slog.Logger, maxConcurre
 		log:           log,
 		reconcileEach: 15 * time.Second,
 		sem:           make(chan struct{}, maxConcurrent),
+		trigger:       make(chan struct{}, 1),
 		running:       make(map[ServiceID]*serviceLoop),
+	}
+}
+
+// Trigger asks the scheduler to reconcile soon (e.g. after a service is added or
+// edited) without waiting for the periodic tick. Non-blocking and coalescing.
+func (s *Scheduler) Trigger() {
+	select {
+	case s.trigger <- struct{}{}:
+	default:
 	}
 }
 
@@ -60,6 +71,8 @@ func (s *Scheduler) Start(ctx context.Context) {
 			case <-s.rootCtx.Done():
 				return
 			case <-ticker.C:
+				s.reconcile()
+			case <-s.trigger:
 				s.reconcile()
 			}
 		}

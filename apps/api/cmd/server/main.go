@@ -91,6 +91,7 @@ func run() error {
 	})
 	monitorEngine := monitor.NewEngine(monitorRepo, monitor.NewChecker(), monitor.NewNotifier(log), hub, log)
 	monitorSched := monitor.NewScheduler(monitorRepo, monitorEngine, log, 8)
+	monitorMgr.SetReconciler(monitorSched)
 	monitor.RegisterRoutes(mux, authH.Protect, monitorMgr)
 	mux.Handle("GET /api/stream/monitor", authH.RequireAuth(hub))
 

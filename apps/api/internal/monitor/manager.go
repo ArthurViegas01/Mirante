@@ -17,13 +17,28 @@ var ErrInvalid = errors.New("invalid input")
 
 const maxServicesPerProject = 50
 
+// Reconciler lets the manager nudge the scheduler to re-read services promptly
+// after a change, so new/edited services start being checked without waiting for
+// the periodic reconcile.
+type Reconciler interface{ Trigger() }
+
 // Manager holds the monitor's HTTP-facing use cases.
 type Manager struct {
-	repo Repository
+	repo       Repository
+	reconciler Reconciler
 }
 
 // NewManager builds the monitor manager.
 func NewManager(repo Repository) *Manager { return &Manager{repo: repo} }
+
+// SetReconciler wires the scheduler so config changes take effect promptly.
+func (m *Manager) SetReconciler(r Reconciler) { m.reconciler = r }
+
+func (m *Manager) notifyReconcile() {
+	if m.reconciler != nil {
+		m.reconciler.Trigger()
+	}
+}
 
 // CreateServiceInput is the payload for adding a service.
 type CreateServiceInput struct {
@@ -126,6 +141,7 @@ func (m *Manager) CreateService(ctx context.Context, in CreateServiceInput) (*Se
 	if err := m.repo.CreateService(ctx, svc); err != nil {
 		return nil, err
 	}
+	m.notifyReconcile()
 	return m.repo.GetService(ctx, svc.ID)
 }
 
@@ -169,6 +185,7 @@ func (m *Manager) UpdateService(ctx context.Context, id ServiceID, in UpdateServ
 	if err := m.repo.UpdateServiceConfig(ctx, svc); err != nil {
 		return nil, err
 	}
+	m.notifyReconcile()
 	return m.repo.GetService(ctx, id)
 }
 
@@ -190,12 +207,17 @@ func (m *Manager) SetEnabled(ctx context.Context, id ServiceID, enabled bool) (*
 	if err := m.repo.SetServiceStatus(ctx, id, status, true); err != nil {
 		return nil, err
 	}
+	m.notifyReconcile()
 	return m.repo.GetService(ctx, id)
 }
 
 // DeleteService removes a service and its history.
 func (m *Manager) DeleteService(ctx context.Context, id ServiceID) error {
-	return m.repo.DeleteService(ctx, id)
+	if err := m.repo.DeleteService(ctx, id); err != nil {
+		return err
+	}
+	m.notifyReconcile()
+	return nil
 }
 
 // ListAlerts returns recent alerts (the notification center).
