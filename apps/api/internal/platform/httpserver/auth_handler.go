@@ -31,6 +31,20 @@ func NewAuthHandlers(svc *auth.Service, cfg AuthConfig) *AuthHandlers {
 	return &AuthHandlers{svc: svc, cfg: cfg}
 }
 
+// RegisterRoutes mounts the auth routes on the given mux.
+func (h *AuthHandlers) RegisterRoutes(mux *http.ServeMux) {
+	mux.Handle("POST /api/auth/login", http.HandlerFunc(h.Login))
+	mux.Handle("GET /api/auth/me", h.RequireAuth(http.HandlerFunc(h.Me)))
+	mux.Handle("POST /api/auth/logout", h.Protect(http.HandlerFunc(h.Logout)))
+}
+
+// Protect wraps a handler with session auth and CSRF enforcement. CSRF only
+// applies to unsafe methods, so GET routes pass through unaffected. Domain
+// modules wrap their whole sub-router with this.
+func (h *AuthHandlers) Protect(next http.Handler) http.Handler {
+	return h.RequireAuth(h.CSRF(next))
+}
+
 type loginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=1"`

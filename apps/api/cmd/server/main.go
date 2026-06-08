@@ -18,6 +18,8 @@ import (
 	"github.com/lumni/mirante/internal/platform/logging"
 	"github.com/lumni/mirante/internal/platform/migrate"
 	"github.com/lumni/mirante/internal/platform/otel"
+	"github.com/lumni/mirante/internal/platform/ratelimit"
+	"github.com/lumni/mirante/internal/projects"
 )
 
 func main() {
@@ -59,7 +61,27 @@ func run() error {
 		return err
 	}
 
-	handler := httpserver.Router(httpserver.Deps{Log: log, Auth: authSvc, Config: cfg})
+	authH := httpserver.NewAuthHandlers(authSvc, httpserver.AuthConfig{
+		CookieName:    cfg.SessionCookie,
+		Secure:        cfg.IsProd(),
+		AllowedOrigin: cfg.WebOrigin,
+	})
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", httpserver.Healthz)
+	authH.RegisterRoutes(mux)
+
+	projectsSvc := projects.NewService(projects.NewSQLiteRepo(database))
+	projects.RegisterRoutes(mux, authH.Protect, projectsSvc)
+
+	ipLimiter := ratelimit.New(240, time.Minute)
+	handler := httpserver.Chain(mux,
+		httpserver.RequestID(),
+		httpserver.Recover(log),
+		httpserver.SecurityHeaders(cfg.IsProd()),
+		httpserver.CORS(cfg.WebOrigin),
+		httpserver.RateLimit(ipLimiter),
+	)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

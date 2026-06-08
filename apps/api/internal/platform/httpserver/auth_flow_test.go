@@ -16,14 +16,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/lumni/mirante/internal/platform/auth"
-	"github.com/lumni/mirante/internal/platform/config"
 	"github.com/lumni/mirante/internal/platform/db"
 	"github.com/lumni/mirante/internal/platform/migrate"
+	"github.com/lumni/mirante/internal/platform/ratelimit"
 )
 
 const (
-	testEmail = "owner@example.com"
-	testPass  = "s3cret-password"
+	testEmail  = "owner@example.com"
+	testPass   = "s3cret-password"
+	testOrigin = "http://localhost:5173"
 )
 
 func setup(t *testing.T) (string, *http.Client) {
@@ -38,17 +39,23 @@ func setup(t *testing.T) (string, *http.Client) {
 	svc := auth.NewService(database.DB, time.Hour)
 	require.NoError(t, svc.Bootstrap(ctx, testEmail, testPass, ""))
 
-	cfg := config.Config{
-		AppEnv:        "development",
-		WebOrigin:     "http://localhost:5173",
-		SessionCookie: "mirante_session",
-		SessionTTL:    time.Hour,
-	}
-	handler := Router(Deps{
-		Log:    slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Auth:   svc,
-		Config: cfg,
+	authH := NewAuthHandlers(svc, AuthConfig{
+		CookieName:    "mirante_session",
+		Secure:        false,
+		AllowedOrigin: testOrigin,
 	})
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", Healthz)
+	authH.RegisterRoutes(mux)
+
+	handler := Chain(mux,
+		RequestID(),
+		Recover(slog.New(slog.NewTextHandler(io.Discard, nil))),
+		SecurityHeaders(false),
+		CORS(testOrigin),
+		RateLimit(ratelimit.New(240, time.Minute)),
+	)
 
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
@@ -107,8 +114,6 @@ func TestAuthFlow(t *testing.T) {
 
 	require.Equal(t, http.StatusOK,
 		statusOf(t, client, newRequest(t, http.MethodGet, base+"/api/auth/me", "", "")))
-	require.Equal(t, http.StatusOK,
-		statusOf(t, client, newRequest(t, http.MethodGet, base+"/api/ping", "", "")))
 
 	// Logout without a CSRF token must be rejected.
 	require.Equal(t, http.StatusForbidden,
