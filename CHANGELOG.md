@@ -10,6 +10,13 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### Adicionado
+- **Observabilidade: OTLP traces (F5, ADR-0007).** O `internal/platform/otel`
+  deixou de ser no-op: com `OTEL_EXPORTER_OTLP_ENDPOINT` setada, a API exporta
+  traces via **OTLP/HTTP** (provider real do SDK, resource com `service.name`,
+  propagação W3C `traceparent`/baggage) e embrulha o handler raiz com `otelhttp`
+  (um span server por request, método/status como atributos). Sem endpoint, segue
+  no-op (zero overhead em dev/testes); falha no exporter degrada para no-op em vez
+  de derrubar o boot. **RBAC fica adiado** enquanto o app for single-user (ADR-0007).
 - **Webhooks de alerta (F5).** Cada transição de serviço do Monitor (up/degraded/
   down) pode ser entregue a um endpoint externo: com `ALERT_WEBHOOK_URL` (http/https)
   setada, a API faz `POST` JSON (evento, severidade, título legível, from/to, etc.)
