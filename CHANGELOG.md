@@ -47,6 +47,10 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   mestre (PDF via `go-pdf/fpdf` pure-Go; **DOCX via OOXML escrito à mão** com
   `archive/zip`, sem dependência nova). Botões na `/cv` salvam e baixam. Inclui o novo
   campo **contato** (migração `0012`), preenchido também pelo import.
+- **Adaptação do CV por vaga (LLM):** `POST /api/cv/adapt` — dado o CV mestre + uma vaga,
+  o LLM gera um **resumo adaptado** para aquela vaga + uma **análise** (pontos fortes,
+  lacunas, dica). Botão "🎯 Adaptar CV" em cada vaga. cv não importa jobs (a vaga chega
+  por input — ADR-0001).
 
 ### Alterado
 - **Monitor agora é centrado no projeto:** a aba Monitor saiu da sidebar; o status ao
@@ -65,8 +69,8 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   (`PUT /api/profile` virou update parcial — `skills` opcional).
 
 ### A fazer
-- F3 — **adaptação do CV por vaga via LLM** + refino de aderência por LLM; e CRM de
-  candidaturas em `internal/applications`.
+- F3 — CRM de candidaturas em `internal/applications` (pipeline + follow-ups,
+  referenciando as vagas). Última peça da F3.
 
 ## [0.5.0] - 2026-06-08
 
