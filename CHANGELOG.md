@@ -20,11 +20,15 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   uso num ledger (`llm_usage`, migração `0007`); `CompleteJSON` pede saída JSON e valida
   por unmarshal no tipo do chamador. Provider `mock` para dev sem key (a API sobe e as
   features de LLM degradam). Keys: `LLM_API_KEY`/`GROQ_API_KEY` etc.
+- **Domínio `jobs` (Vagas):** CRUD de vagas com REST em `/api/jobs` e migração `0008`
+  (`jobs` + `job_skills`). As skills exigidas são **extraídas deterministicamente** da
+  descrição via `skills.Match`; `POST /api/jobs/{id}/enrich` usa o LLM para preencher
+  empresa/senioridade/modelo/resumo. UI em `/vagas` (lista, cadastro colando a descrição,
+  botão "Enriquecer com IA"). O compose repassa `GROQ_API_KEY` (de um `.env` na raiz).
 
 ### A fazer
-- F3 — Vagas, CV e CRM sobre `skills`+`llm`: domínio `jobs` (aderência determinística via
-  skills + refino por LLM, joblink com SSRF ADR-0003), `cv` (CV mestre, adaptação,
-  export **PDF+DOCX** pure-Go) e CRM em `internal/applications`.
+- F3 — `cv` (CV mestre, adaptação por vaga via LLM, export **PDF+DOCX** pure-Go) com
+  aderência vaga↔CV, e CRM de candidaturas em `internal/applications`.
 
 ## [0.5.0] - 2026-06-08
 
