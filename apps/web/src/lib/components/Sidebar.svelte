@@ -22,6 +22,11 @@
 			href: '/vagas',
 			label: 'Vagas',
 			icon: 'M3 7h18v13H3zM8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'
+		},
+		{
+			href: '/cv',
+			label: 'CV',
+			icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8'
 		}
 	];
 

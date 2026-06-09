@@ -3,14 +3,19 @@
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
 	import Select from '$lib/components/Select.svelte';
+	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import ProfileHeadline from '$lib/components/ProfileHeadline.svelte';
 	import { api } from '$lib/api.js';
 	import { MODELO_OPTIONS, modeloLabel } from '$lib/jobMeta.js';
+	import { aderencia, aderenciaVariant } from '$lib/aderencia.js';
 
 	let jobs = $state([]);
+	let mySkills = $state([]);
 	let loading = $state(true);
 	let error = $state('');
 	let showForm = $state(false);
+
+	let mySet = $derived(new Set(mySkills.map((s) => s.toLowerCase())));
 
 	let titulo = $state('');
 	let empresa = $state('');
@@ -32,8 +37,9 @@
 		loading = true;
 		error = '';
 		try {
-			const res = await api('/api/jobs');
-			jobs = res.jobs;
+			const [jres, profile] = await Promise.all([api('/api/jobs'), api('/api/profile')]);
+			jobs = jres.jobs;
+			mySkills = profile.skills ?? [];
 		} catch (e) {
 			error = e.message;
 		} finally {
@@ -169,13 +175,19 @@
 {:else}
 	<div class="list">
 		{#each jobs as job (job.id)}
-			<article class="panel card">
+			{@const a = aderencia(job.skills, mySkills)}
+				<article class="panel card">
 				<div class="card-head">
 					<div>
 						<h2>{job.titulo}</h2>
 						{#if job.empresa}<span class="empresa">{job.empresa}</span>{/if}
 					</div>
-					<span class="chip">{modeloLabel(job.modelo)}</span>
+					<div class="head-badges">
+						{#if mySkills.length && a.score !== null}
+							<StatusBadge status={aderenciaVariant(a.score)} label={`${a.score}% match`} />
+						{/if}
+						<span class="chip">{modeloLabel(job.modelo)}</span>
+					</div>
 				</div>
 
 				<div class="meta">
@@ -188,7 +200,13 @@
 
 				{#if job.skills.length}
 					<div class="skills">
-						{#each job.skills as s (s)}<span class="skill">{s}</span>{/each}
+						{#each job.skills as s (s)}
+							<span
+								class="skill"
+								class:have={mySet.has(s.toLowerCase())}
+								class:lack={mySkills.length && !mySet.has(s.toLowerCase())}>{s}</span
+							>
+						{/each}
 					</div>
 				{:else}
 					<p class="muted small">Nenhuma skill reconhecida na descrição.</p>
@@ -364,6 +382,12 @@
 		flex-wrap: wrap;
 		gap: 4px;
 	}
+	.head-badges {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		flex-shrink: 0;
+	}
 	.skill {
 		font-family: var(--font-mono);
 		font-size: 11px;
@@ -371,6 +395,15 @@
 		border-radius: var(--radius-full);
 		background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
 		color: var(--color-accent);
+	}
+	.skill.have {
+		background-color: var(--color-success-bg);
+		color: var(--color-success-text);
+	}
+	.skill.lack {
+		background-color: transparent;
+		color: var(--color-text-muted);
+		border: var(--border-width-1) solid var(--color-border);
 	}
 	.card-actions {
 		display: flex;

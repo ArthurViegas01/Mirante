@@ -13,5 +13,6 @@ type Profile struct {
 	Titulo     string    `json:"titulo"`      // current headline / profession
 	TituloAlvo string    `json:"titulo_alvo"` // role being aimed for
 	Resumo     string    `json:"resumo"`
+	Skills     []string  `json:"skills"` // master skills (canonical when recognized)
 	UpdatedAt  time.Time `json:"updated_at"`
 }
