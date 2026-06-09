@@ -53,3 +53,25 @@ func TestProfileValidation(t *testing.T) {
 	_, err := newService(t).SaveProfile(context.Background(), ProfileInput{Titulo: strings.Repeat("x", 121)})
 	require.ErrorIs(t, err, ErrInvalid)
 }
+
+func TestProfileSkills(t *testing.T) {
+	ctx := context.Background()
+	svc := newService(t)
+
+	// golang→Go (canonical), "react"/"React" dedup, blank skipped, unknown kept.
+	p, err := svc.SaveProfile(ctx, ProfileInput{
+		Titulo: "Dev",
+		Skills: []string{"golang", "React", "react", "Salesforce", "  "},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"Go", "React", "Salesforce"}, p.Skills) // returned sorted
+
+	got, err := svc.GetProfile(ctx)
+	require.NoError(t, err)
+	require.Equal(t, []string{"Go", "React", "Salesforce"}, got.Skills)
+
+	// Re-saving replaces the whole set.
+	p2, err := svc.SaveProfile(ctx, ProfileInput{Titulo: "Dev", Skills: []string{"Python"}})
+	require.NoError(t, err)
+	require.Equal(t, []string{"Python"}, p2.Skills)
+}
