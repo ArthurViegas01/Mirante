@@ -19,12 +19,12 @@ func NewSQLiteRepo(d *idb.DB) Repository { return &sqliteRepo{db: d} }
 
 func (r *sqliteRepo) GetProfile(ctx context.Context) (*Profile, error) {
 	var (
-		nome, titulo, tituloAlvo, resumo, updatedAt sql.NullString
-		p                                           Profile
+		nome, titulo, tituloAlvo, contato, resumo, updatedAt sql.NullString
+		p                                                    Profile
 	)
 	err := r.db.QueryRowContext(ctx,
-		`SELECT nome, titulo, titulo_alvo, resumo, updated_at FROM cv_profile WHERE id = ?`, profileID).
-		Scan(&nome, &titulo, &tituloAlvo, &resumo, &updatedAt)
+		`SELECT nome, titulo, titulo_alvo, contato, resumo, updated_at FROM cv_profile WHERE id = ?`, profileID).
+		Scan(&nome, &titulo, &tituloAlvo, &contato, &resumo, &updatedAt)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		// No profile row yet — leave the identity blank but still load sub-lists.
@@ -34,6 +34,7 @@ func (r *sqliteRepo) GetProfile(ctx context.Context) (*Profile, error) {
 		p.Nome = nome.String
 		p.Titulo = titulo.String
 		p.TituloAlvo = tituloAlvo.String
+		p.Contato = contato.String
 		p.Resumo = resumo.String
 		if updatedAt.Valid {
 			p.UpdatedAt = idb.ParseTime(updatedAt.String)
@@ -117,12 +118,13 @@ func (r *sqliteRepo) listEducation(ctx context.Context) ([]Education, error) {
 func (r *sqliteRepo) SaveCV(ctx context.Context, p *Profile) error {
 	return r.db.WithTx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO cv_profile (id, nome, titulo, titulo_alvo, resumo, updated_at)
-			 VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			`INSERT INTO cv_profile (id, nome, titulo, titulo_alvo, contato, resumo, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			 ON CONFLICT(id) DO UPDATE SET
 			   nome = excluded.nome, titulo = excluded.titulo, titulo_alvo = excluded.titulo_alvo,
-			   resumo = excluded.resumo, updated_at = excluded.updated_at`,
-			profileID, nullable(p.Nome), nullable(p.Titulo), nullable(p.TituloAlvo), nullable(p.Resumo)); err != nil {
+			   contato = excluded.contato, resumo = excluded.resumo, updated_at = excluded.updated_at`,
+			profileID, nullable(p.Nome), nullable(p.Titulo), nullable(p.TituloAlvo),
+			nullable(p.Contato), nullable(p.Resumo)); err != nil {
 			return err
 		}
 

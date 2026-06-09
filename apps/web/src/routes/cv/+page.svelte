@@ -7,6 +7,7 @@
 	let nome = $state('');
 	let titulo = $state('');
 	let tituloAlvo = $state('');
+	let contato = $state('');
 	let resumo = $state('');
 	let skillsText = $state('');
 	let savedSkills = $state([]);
@@ -30,6 +31,7 @@
 			nome = p.nome ?? '';
 			titulo = p.titulo ?? '';
 			tituloAlvo = p.titulo_alvo ?? '';
+			contato = p.contato ?? '';
 			resumo = p.resumo ?? '';
 			savedSkills = p.skills ?? [];
 			skillsText = savedSkills.join(', ');
@@ -64,6 +66,7 @@
 			nome = d.nome || nome;
 			titulo = d.titulo || titulo;
 			tituloAlvo = d.titulo_alvo || tituloAlvo;
+			contato = d.contato || contato;
 			resumo = d.resumo || resumo;
 			if (d.skills?.length) skillsText = d.skills.join(', ');
 			if (d.experiences?.length) {
@@ -97,27 +100,58 @@
 	const addEducation = () => education.push({ instituicao: '', curso: '', inicio: '', fim: '' });
 	const removeEducation = (i) => education.splice(i, 1);
 
+	async function persist() {
+		const skills = skillsText
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean);
+		const p = await api('/api/cv', {
+			method: 'PUT',
+			body: { nome, titulo, titulo_alvo: tituloAlvo, contato, resumo, skills, experiences, education }
+		});
+		savedSkills = p.skills ?? [];
+		skillsText = savedSkills.join(', ');
+		return p;
+	}
+
 	async function save(e) {
 		e.preventDefault();
 		saving = true;
 		error = '';
 		saved = false;
 		try {
-			const skills = skillsText
-				.split(',')
-				.map((s) => s.trim())
-				.filter(Boolean);
-			const p = await api('/api/cv', {
-				method: 'PUT',
-				body: { nome, titulo, titulo_alvo: tituloAlvo, resumo, skills, experiences, education }
-			});
-			savedSkills = p.skills ?? [];
-			skillsText = savedSkills.join(', ');
+			await persist();
 			saved = true;
 		} catch (e) {
 			error = e.message;
 		} finally {
 			saving = false;
+		}
+	}
+
+	let exporting = $state('');
+
+	async function downloadCV(format) {
+		exporting = format;
+		error = '';
+		try {
+			await persist(); // export reflects the current form
+			const res = await fetch(`/api/cv/export?format=${format}`, { credentials: 'include' });
+			if (!res.ok) throw new Error('falha ao gerar o documento');
+			const blob = await res.blob();
+			const url = URL.createObjectURL(blob);
+			const slug = (nome || 'export').trim().replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `CV-${slug || 'export'}.${format}`;
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			URL.revokeObjectURL(url);
+		} catch (e) {
+			error = e.message;
+		} finally {
+			exporting = '';
 		}
 	}
 </script>
@@ -155,6 +189,11 @@
 				<Input label="Profissão atual" bind:value={titulo} placeholder="Dev Backend Pleno" />
 				<Input label="Profissão almejada" bind:value={tituloAlvo} placeholder="Staff Engineer" />
 			</div>
+			<Input
+				label="Contato (e-mail · telefone · localização · links)"
+				bind:value={contato}
+				placeholder="arthur@email.com · +55 51 … · Porto Alegre · github.com/…"
+			/>
 			<label class="field">
 				<span class="label">Resumo profissional</span>
 				<textarea bind:value={resumo} rows="4" placeholder="Um parágrafo sobre você, sua stack e o que busca."></textarea>
@@ -219,6 +258,12 @@
 		{#if error}<p class="error">{error}</p>{/if}
 		<div class="actions">
 			{#if saved}<span class="ok">Salvo ✓</span>{/if}
+			<Button variant="secondary" onclick={() => downloadCV('pdf')} disabled={!!exporting || saving}>
+				{exporting === 'pdf' ? 'Gerando…' : 'Exportar PDF'}
+			</Button>
+			<Button variant="secondary" onclick={() => downloadCV('docx')} disabled={!!exporting || saving}>
+				{exporting === 'docx' ? 'Gerando…' : 'Exportar DOCX'}
+			</Button>
 			<Button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Salvar CV'}</Button>
 		</div>
 	</form>

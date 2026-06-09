@@ -43,6 +43,10 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 - **Import de CV por texto:** `POST /api/cv/import` usa o LLM para estruturar um CV (ou
   inventário de skills) colado em {identidade, resumo, skills, experiências, educação};
   a `/cv` preenche o formulário p/ revisão. Validado ao vivo com um CV real (Groq).
+- **Export do CV em PDF e DOCX:** `GET /api/cv/export?format=pdf|docx` renderiza o CV
+  mestre (PDF via `go-pdf/fpdf` pure-Go; **DOCX via OOXML escrito à mão** com
+  `archive/zip`, sem dependência nova). Botões na `/cv` salvam e baixam. Inclui o novo
+  campo **contato** (migração `0012`), preenchido também pelo import.
 
 ### Alterado
 - **Monitor agora é centrado no projeto:** a aba Monitor saiu da sidebar; o status ao
@@ -61,8 +65,8 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   (`PUT /api/profile` virou update parcial — `skills` opcional).
 
 ### A fazer
-- F3 — `cv`: **export PDF+DOCX** pure-Go e **adaptação por vaga via LLM**; refino de
-  aderência por LLM; e CRM de candidaturas em `internal/applications`.
+- F3 — **adaptação do CV por vaga via LLM** + refino de aderência por LLM; e CRM de
+  candidaturas em `internal/applications`.
 
 ## [0.5.0] - 2026-06-08
 

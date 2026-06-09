@@ -40,6 +40,7 @@ type ProfileInput struct {
 	Nome       string    `json:"nome"`
 	Titulo     string    `json:"titulo"`
 	TituloAlvo string    `json:"titulo_alvo"`
+	Contato    string    `json:"contato"`
 	Resumo     string    `json:"resumo"`
 	Skills     *[]string `json:"skills"`
 }
@@ -54,6 +55,7 @@ func (s *Service) SaveProfile(ctx context.Context, in ProfileInput) (*Profile, e
 	cur.Nome = strings.TrimSpace(in.Nome)
 	cur.Titulo = strings.TrimSpace(in.Titulo)
 	cur.TituloAlvo = strings.TrimSpace(in.TituloAlvo)
+	cur.Contato = strings.TrimSpace(in.Contato)
 	cur.Resumo = strings.TrimSpace(in.Resumo)
 	if in.Skills != nil {
 		cur.Skills = normalizeSkills(*in.Skills)
@@ -72,6 +74,7 @@ type CVInput struct {
 	Nome        string            `json:"nome"`
 	Titulo      string            `json:"titulo"`
 	TituloAlvo  string            `json:"titulo_alvo"`
+	Contato     string            `json:"contato"`
 	Resumo      string            `json:"resumo"`
 	Skills      []string          `json:"skills"`
 	Experiences []ExperienceInput `json:"experiences"`
@@ -101,6 +104,7 @@ func (s *Service) SaveCV(ctx context.Context, in CVInput) (*Profile, error) {
 		Nome:       strings.TrimSpace(in.Nome),
 		Titulo:     strings.TrimSpace(in.Titulo),
 		TituloAlvo: strings.TrimSpace(in.TituloAlvo),
+		Contato:    strings.TrimSpace(in.Contato),
 		Resumo:     strings.TrimSpace(in.Resumo),
 		Skills:     normalizeSkills(in.Skills),
 	}
@@ -145,6 +149,9 @@ func validateProfile(p *Profile) error {
 		if len([]rune(f.value)) > 120 {
 			return fmt.Errorf("%w: %s muito longo (max 120)", ErrInvalid, f.name)
 		}
+	}
+	if len([]rune(p.Contato)) > 300 {
+		return fmt.Errorf("%w: contato muito longo (max 300)", ErrInvalid)
 	}
 	if len([]rune(p.Resumo)) > 2000 {
 		return fmt.Errorf("%w: resumo muito longo (max 2000)", ErrInvalid)
@@ -206,6 +213,7 @@ type cvExtract struct {
 	Nome        string   `json:"nome"`
 	Titulo      string   `json:"titulo"`
 	TituloAlvo  string   `json:"titulo_alvo"`
+	Contato     string   `json:"contato"`
 	Resumo      string   `json:"resumo"`
 	Skills      []string `json:"skills"`
 	Experiences []struct {
@@ -225,7 +233,8 @@ type cvExtract struct {
 
 const cvImportSystem = `Você extrai um currículo estruturado de um texto colado (CV, inventário de skills ou perfil).
 Responda APENAS com um objeto JSON com as chaves: "nome", "titulo" (cargo/headline atual),
-"titulo_alvo" (cargo almejado, "" se não houver), "resumo" (resumo profissional em português),
+"titulo_alvo" (cargo almejado, "" se não houver), "contato" (uma linha com e-mail, telefone,
+localização e links, separados por " · "), "resumo" (resumo profissional em português),
 "skills" (lista de tecnologias/competências, nomes curtos), "experiences" (lista de
 {empresa, cargo, inicio, fim, descricao}) e "education" (lista de {instituicao, curso, inicio, fim}).
 Preserve os detalhes das descrições de experiência. Use "" para campos ausentes e "atual" para
@@ -259,6 +268,7 @@ func (s *Service) ImportDraft(ctx context.Context, in ImportInput) (*Profile, er
 		Nome:       strings.TrimSpace(out.Nome),
 		Titulo:     strings.TrimSpace(out.Titulo),
 		TituloAlvo: strings.TrimSpace(out.TituloAlvo),
+		Contato:    strings.TrimSpace(out.Contato),
 		Resumo:     strings.TrimSpace(out.Resumo),
 		Skills:     normalizeSkills(out.Skills),
 	}
@@ -297,4 +307,21 @@ func (s *Service) ImportDraft(ctx context.Context, in ImportInput) (*Profile, er
 		}
 	}
 	return p, nil
+}
+
+// Export renders the master CV in the given format ("pdf" by default, or "docx"),
+// returning the bytes, the content type, and a download filename.
+func (s *Service) Export(ctx context.Context, format string) (data []byte, contentType, filename string, err error) {
+	p, err := s.repo.GetProfile(ctx)
+	if err != nil {
+		return nil, "", "", err
+	}
+	switch format {
+	case "docx":
+		data, err = RenderDOCX(p)
+		return data, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", cvFilename(p, "docx"), err
+	default:
+		data, err = RenderPDF(p)
+		return data, "application/pdf", cvFilename(p, "pdf"), err
+	}
 }
