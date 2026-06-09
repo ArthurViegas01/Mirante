@@ -33,6 +33,11 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   perfil mestre singleton em `/api/profile` (migração `0009`, upsert). O header de
   `/vagas` mostra a **profissão atual e a almejada** (editável inline) — fundação do
   CV mestre que cresce na sequência (experiências, adaptação por vaga, export PDF/DOCX).
+- **CV: skills mestre + aderência vaga↔CV:** o domínio `cv` ganhou as **skills mestre**
+  do dono (`/api/profile`, migração `0010`, canonicalizadas via skills kernel) e a
+  página **`/cv`** para gerenciá-las. Em `/vagas`, cada vaga mostra o **% de aderência**
+  (overlap das skills exigidas com as suas) e destaca as que você tem (verde) vs as
+  faltantes — base determinística do match (refino por LLM virá com as experiências).
 
 ### Alterado
 - **Monitor agora é centrado no projeto:** a aba Monitor saiu da sidebar; o status ao
@@ -49,8 +54,8 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   completo da vaga (prompt ajustado + limites de entrada/saída maiores).
 
 ### A fazer
-- F3 — `cv` (CV mestre, adaptação por vaga via LLM, export **PDF+DOCX** pure-Go) com
-  aderência vaga↔CV, e CRM de candidaturas em `internal/applications`.
+- F3 — `cv`: experiências/educação no CV mestre, **adaptação por vaga via LLM** e
+  **export PDF+DOCX** pure-Go; e CRM de candidaturas em `internal/applications`.
 
 ## [0.5.0] - 2026-06-08
 
