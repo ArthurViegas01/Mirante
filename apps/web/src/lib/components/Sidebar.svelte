@@ -8,7 +8,6 @@
 			label: 'Projetos',
 			icon: 'M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'
 		},
-		{ href: '/monitor', label: 'Monitor', icon: 'M3 12h4l3 8 4-16 3 8h4' },
 		{
 			href: '/tarefas',
 			label: 'Tarefas',
