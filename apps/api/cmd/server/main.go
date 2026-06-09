@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lumni/mirante/internal/applications"
 	"github.com/lumni/mirante/internal/cv"
 	"github.com/lumni/mirante/internal/jobs"
 	"github.com/lumni/mirante/internal/llm"
@@ -110,6 +111,9 @@ func run() error {
 
 	cvSvc := cv.NewService(cv.NewSQLiteRepo(database), llmClient)
 	cv.RegisterRoutes(mux, authH.Protect, cvSvc)
+
+	applicationsSvc := applications.NewService(applications.NewSQLiteRepo(database))
+	applications.RegisterRoutes(mux, authH.Protect, applicationsSvc)
 
 	monitorRepo := monitor.NewSQLiteRepo(database)
 	monitorMgr := monitor.NewManager(monitorRepo)
