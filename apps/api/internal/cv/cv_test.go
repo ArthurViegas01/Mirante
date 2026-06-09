@@ -7,18 +7,21 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/lumni/mirante/internal/llm"
 	idb "github.com/lumni/mirante/internal/platform/db"
 	"github.com/lumni/mirante/internal/platform/migrate"
 )
 
-func newService(t *testing.T) *Service {
+func newService(t *testing.T) *Service { return newServiceLLM(t, nil) }
+
+func newServiceLLM(t *testing.T, client *llm.Client) *Service {
 	t.Helper()
 	ctx := context.Background()
 	database, err := idb.Open(ctx, ":memory:", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = database.Close() })
 	require.NoError(t, migrate.Up(database.DB))
-	return NewService(NewSQLiteRepo(database))
+	return NewService(NewSQLiteRepo(database), client)
 }
 
 func TestProfileEmptyByDefault(t *testing.T) {
@@ -88,4 +91,40 @@ func TestSaveProfilePreservesSkillsAndCV(t *testing.T) {
 func TestProfileValidation(t *testing.T) {
 	_, err := newService(t).SaveCV(context.Background(), CVInput{Titulo: strings.Repeat("x", 121)})
 	require.ErrorIs(t, err, ErrInvalid)
+}
+
+func TestImportDraft(t *testing.T) {
+	ctx := context.Background()
+	client := llm.NewClient(llm.NewMock(
+		`{"nome":"Arthur","titulo":"Full-Stack Engineer","titulo_alvo":"Staff Engineer",
+		  "resumo":"Engenheiro de software.","skills":["golang","FastAPI","react","react"],
+		  "experiences":[{"empresa":"Dataglass","cargo":"Dev","inicio":"2023","fim":"2024","descricao":"Django + React"},
+		                 {"empresa":"","cargo":"","descricao":""}],
+		  "education":[{"instituicao":"PUCRS","curso":"Eng. de Software","inicio":"2021","fim":"2025"}]}`,
+	), nil, nil)
+	svc := newServiceLLM(t, client)
+
+	d, err := svc.ImportDraft(ctx, ImportInput{Text: "currículo colado…"})
+	require.NoError(t, err)
+	require.Equal(t, "Arthur", d.Nome)
+	require.Equal(t, "Staff Engineer", d.TituloAlvo)
+	require.Contains(t, d.Skills, "Go") // golang → Go (canonical)
+	require.Contains(t, d.Skills, "React")
+	require.Len(t, d.Experiences, 1) // blank row dropped
+	require.Equal(t, "Dataglass", d.Experiences[0].Empresa)
+	require.Len(t, d.Education, 1)
+
+	// The draft is NOT persisted until saved.
+	got, _ := svc.GetProfile(ctx)
+	require.Empty(t, got.Experiences)
+}
+
+func TestImportRequiresLLMAndText(t *testing.T) {
+	ctx := context.Background()
+	_, err := newService(t).ImportDraft(ctx, ImportInput{Text: "x"})
+	require.ErrorIs(t, err, ErrLLMUnavailable) // nil client
+
+	withLLM := newServiceLLM(t, llm.NewClient(llm.NewMock("{}"), nil, nil))
+	_, err = withLLM.ImportDraft(ctx, ImportInput{Text: "   "})
+	require.ErrorIs(t, err, ErrInvalid) // empty text checked first
 }

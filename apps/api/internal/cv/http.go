@@ -19,6 +19,21 @@ func RegisterRoutes(mux *http.ServeMux, protect func(http.Handler) http.Handler,
 	mux.Handle("GET /api/profile", protect(http.HandlerFunc(h.get)))
 	mux.Handle("PUT /api/profile", protect(http.HandlerFunc(h.save)))
 	mux.Handle("PUT /api/cv", protect(http.HandlerFunc(h.saveCV)))
+	mux.Handle("POST /api/cv/import", protect(http.HandlerFunc(h.importCV)))
+}
+
+func (h *handlers) importCV(w http.ResponseWriter, r *http.Request) {
+	var in ImportInput
+	if err := respond.Decode(w, r, &in, maxBody); err != nil {
+		respond.Error(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	draft, err := h.svc.ImportDraft(r.Context(), in)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	respond.JSON(w, http.StatusOK, draft)
 }
 
 func (h *handlers) get(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +77,8 @@ func writeErr(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, ErrInvalid):
 		respond.Error(w, http.StatusBadRequest, "validation_error", err.Error())
+	case errors.Is(err, ErrLLMUnavailable):
+		respond.Error(w, http.StatusServiceUnavailable, "llm_unavailable", "LLM não configurado (defina a API key)")
 	default:
 		respond.Error(w, http.StatusInternalServerError, "internal", "internal error")
 	}

@@ -108,7 +108,7 @@ func run() error {
 	jobsSvc := jobs.NewService(jobs.NewSQLiteRepo(database), llmClient, jobLinkFetcher)
 	jobs.RegisterRoutes(mux, authH.Protect, jobsSvc)
 
-	cvSvc := cv.NewService(cv.NewSQLiteRepo(database))
+	cvSvc := cv.NewService(cv.NewSQLiteRepo(database), llmClient)
 	cv.RegisterRoutes(mux, authH.Protect, cvSvc)
 
 	monitorRepo := monitor.NewSQLiteRepo(database)
