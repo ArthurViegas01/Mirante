@@ -21,10 +21,11 @@ linters:
         - G115
         - G124
     misspell:
-      # Domain vocabulary is Portuguese; "anual" (subscriptions cycle) is correct
-      # pt-BR, not a misspelling of the English "annual".
+      # Domain vocabulary and comments are Portuguese; these are correct pt-BR,
+      # not misspellings of their English look-alikes (annual / protocols).
       ignore-rules:
         - anual
+        - protocolos
     revive:
       rules:
         - name: exported
