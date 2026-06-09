@@ -65,14 +65,14 @@
 	}
 	.secondary:hover:not(:disabled) {
 		border-color: var(--color-border-strong);
-		background-color: var(--mist);
+		background-color: var(--color-surface-sunken);
 	}
 	.ghost {
 		background-color: transparent;
 		color: var(--color-text-secondary);
 	}
 	.ghost:hover:not(:disabled) {
-		background-color: var(--mist);
+		background-color: var(--color-surface-sunken);
 		color: var(--color-text);
 	}
 </style>
