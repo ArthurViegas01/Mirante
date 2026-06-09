@@ -10,6 +10,16 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### Adicionado
+- **Webhooks de alerta (F5).** Cada transição de serviço do Monitor (up/degraded/
+  down) pode ser entregue a um endpoint externo: com `ALERT_WEBHOOK_URL` (http/https)
+  setada, a API faz `POST` JSON (evento, severidade, título legível, from/to, etc.)
+  a cada alerta, sobre a interface `AlertChannel`/`Notifier` que já existia (erros
+  isolados, timeout por chamada). A URL é do dono (confiável) — sem SSRF-guard,
+  diferente do import de vaga. Vazio = só o alerta in-app (sino). Sem migração.
+- **Deploy no Fly.io (config).** `apps/api/fly.toml` pronto para a API: máquina
+  única (hub SSE + scheduler + compactor são in-process — ADR-0002), healthcheck,
+  `force_https`, banco Turso hospedado (sem volume), segredos via `fly secrets`,
+  dono via signup. Seção **Deploy (Fly.io)** no README.
 - **Signup do dono + banco hospedado (prontidão para deploy).** O acesso deixa de
   exigir o owner por env: se `OWNER_EMAIL` não for fornecido, a instância sobe sem
   dono e o **primeiro acesso pela própria UI** reivindica a conta do dono
