@@ -21,6 +21,23 @@ func RegisterRoutes(mux *http.ServeMux, protect func(http.Handler) http.Handler,
 	mux.Handle("PATCH /api/jobs/{id}", protect(http.HandlerFunc(h.update)))
 	mux.Handle("DELETE /api/jobs/{id}", protect(http.HandlerFunc(h.remove)))
 	mux.Handle("POST /api/jobs/{id}/enrich", protect(http.HandlerFunc(h.enrich)))
+	mux.Handle("POST /api/jobs/import", protect(http.HandlerFunc(h.importDraft)))
+}
+
+func (h *handlers) importDraft(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		URL string `json:"url"`
+	}
+	if err := respond.Decode(w, r, &in, maxBody); err != nil {
+		respond.Error(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	draft, err := h.svc.ImportDraft(r.Context(), in.URL)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	respond.JSON(w, http.StatusOK, draft)
 }
 
 func (h *handlers) list(w http.ResponseWriter, r *http.Request) {
@@ -94,6 +111,10 @@ func writeErr(w http.ResponseWriter, err error) {
 		respond.Error(w, http.StatusBadRequest, "validation_error", err.Error())
 	case errors.Is(err, ErrLLMUnavailable):
 		respond.Error(w, http.StatusServiceUnavailable, "llm_unavailable", "LLM não configurado (defina a API key)")
+	case errors.Is(err, ErrImportUnavailable):
+		respond.Error(w, http.StatusServiceUnavailable, "import_unavailable", "import de link indisponível")
+	case errors.Is(err, ErrImportFailed):
+		respond.Error(w, http.StatusUnprocessableEntity, "import_failed", "não consegui ler a vaga desse link — cole a descrição manualmente")
 	default:
 		respond.Error(w, http.StatusInternalServerError, "internal", "internal error")
 	}

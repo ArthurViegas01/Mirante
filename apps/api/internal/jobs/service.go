@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/lumni/mirante/internal/llm"
+	"github.com/lumni/mirante/internal/platform/httpx"
 	idgen "github.com/lumni/mirante/internal/platform/id"
 	"github.com/lumni/mirante/internal/platform/validate"
 	"github.com/lumni/mirante/internal/skills"
@@ -14,20 +15,25 @@ import (
 
 // Errors.
 var (
-	ErrInvalid        = errors.New("invalid input")
-	ErrLLMUnavailable = errors.New("llm unavailable")
+	ErrInvalid           = errors.New("invalid input")
+	ErrLLMUnavailable    = errors.New("llm unavailable")
+	ErrImportUnavailable = errors.New("import unavailable")
+	ErrImportFailed      = errors.New("could not read the job link")
 )
 
-// Service holds job use cases. The LLM client is optional (nil-safe): without it,
-// Enrich returns ErrLLMUnavailable and the rest works on deterministic skills.
+// Service holds job use cases. The LLM client and the job-link fetcher are both
+// optional (nil-safe): without the LLM, Enrich returns ErrLLMUnavailable; without
+// a fetcher, ImportDraft returns ErrImportUnavailable. Core CRUD and deterministic
+// skill extraction work regardless.
 type Service struct {
-	repo Repository
-	llm  *llm.Client
+	repo    Repository
+	llm     *llm.Client
+	fetcher *httpx.Fetcher
 }
 
 // NewService builds the jobs service.
-func NewService(repo Repository, llmClient *llm.Client) *Service {
-	return &Service{repo: repo, llm: llmClient}
+func NewService(repo Repository, llmClient *llm.Client, fetcher *httpx.Fetcher) *Service {
+	return &Service{repo: repo, llm: llmClient, fetcher: fetcher}
 }
 
 // CreateInput is the payload for adding a job.
