@@ -21,6 +21,21 @@ func RegisterRoutes(mux *http.ServeMux, protect func(http.Handler) http.Handler,
 	mux.Handle("PUT /api/cv", protect(http.HandlerFunc(h.saveCV)))
 	mux.Handle("POST /api/cv/import", protect(http.HandlerFunc(h.importCV)))
 	mux.Handle("GET /api/cv/export", protect(http.HandlerFunc(h.export)))
+	mux.Handle("POST /api/cv/adapt", protect(http.HandlerFunc(h.adapt)))
+}
+
+func (h *handlers) adapt(w http.ResponseWriter, r *http.Request) {
+	var in AdaptInput
+	if err := respond.Decode(w, r, &in, maxBody); err != nil {
+		respond.Error(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	res, err := h.svc.Adapt(r.Context(), in)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	respond.JSON(w, http.StatusOK, res)
 }
 
 func (h *handlers) export(w http.ResponseWriter, r *http.Request) {
