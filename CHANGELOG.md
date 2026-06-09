@@ -10,7 +10,29 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### A fazer
-- F2 — Tarefas (vínculo a projeto e, depois, a vagas).
+- F3 — Vagas, CV e CRM (sobre o kernel `internal/skills`).
+
+## [0.4.0] - 2026-06-08
+
+F2 — Tarefas: trabalho em quadro kanban, vinculável a projetos.
+
+### Adicionado
+- **Tarefas:** domínio completo (CRUD; status kanban `a_fazer`/`fazendo`/`feito`,
+  prioridade, prazo, tags) com REST em `/api/tasks` (filtros `?status=` e
+  `?project=`) e migração `0004` (`tasks` + `task_tags`; `project_id` FK→projects
+  `ON DELETE SET NULL`; `job_id` reservado, FK só na F3). Anatomia espelha
+  `projects`.
+- **UI de Tarefas:** quadro kanban (3 colunas, mover entre colunas), formulário com
+  prioridade/prazo/projeto/tags, destaque de prazo vencido e filtro por projeto.
+- **Project view:** seção "Tarefas abertas" com link para o quadro filtrado; a cópia
+  do excluir esclarece que as tarefas são desvinculadas (não apagadas).
+
+### Corrigido
+- **Guard de auth no SPA:** deslogado vai para `/login` num shell isolado (sem
+  sidebar); logado sai de `/login`; o stream SSE do monitor conecta e desconecta
+  reativamente conforme a sessão.
+- **`api.js`:** corpo não-JSON (página de erro HTML, resposta de proxy) vira uma
+  mensagem limpa em vez de estourar `JSON.parse`.
 
 ## [0.3.0] - 2026-06-08
 
@@ -83,7 +105,8 @@ estrutura e artefatos de fundação.
   assinatura **Glow** (`#5EEAD4`) dos elementos "ao vivo" (`--color-live*`).
 - `README.md` (esqueleto) e este `CHANGELOG.md`.
 
-[Não lançado]: https://example.com/mirante/compare/v0.3.0...HEAD
+[Não lançado]: https://example.com/mirante/compare/v0.4.0...HEAD
+[0.4.0]: https://example.com/mirante/compare/v0.3.0...v0.4.0
 [0.3.0]: https://example.com/mirante/compare/v0.2.0...v0.3.0
 [0.2.0]: https://example.com/mirante/compare/v0.1.0...v0.2.0
 [0.1.0]: https://example.com/mirante/releases/tag/v0.1.0
