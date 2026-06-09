@@ -131,7 +131,18 @@ func run() error {
 		}
 		return out, nil
 	})
-	monitorEngine := monitor.NewEngine(monitorRepo, monitor.NewChecker(), monitor.NewNotifier(log), hub, log)
+	// Optional external alert delivery (F5): an owner-configured webhook receives
+	// each monitor transition. Absent/invalid URL → no channel (in-app only).
+	var alertChannels []monitor.AlertChannel
+	if cfg.AlertWebhookURL != "" {
+		if ch, err := monitor.NewWebhookChannel(cfg.AlertWebhookURL, nil); err != nil {
+			log.Warn("invalid ALERT_WEBHOOK_URL — alert webhook disabled", "err", err)
+		} else {
+			alertChannels = append(alertChannels, ch)
+			log.Info("alert webhook enabled")
+		}
+	}
+	monitorEngine := monitor.NewEngine(monitorRepo, monitor.NewChecker(), monitor.NewNotifier(log, alertChannels...), hub, log)
 	monitorSched := monitor.NewScheduler(monitorRepo, monitorEngine, log, 8)
 	monitorMgr.SetReconciler(monitorSched)
 	monitor.RegisterRoutes(mux, authH.Protect, monitorMgr)
