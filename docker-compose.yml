@@ -22,6 +22,10 @@ services:
       - SESSION_COOKIE_NAME=mirante_session
       - OWNER_EMAIL=owner@example.com
       - OWNER_PASSWORD=change-me-dev
+      # LLM (F3). Set GROQ_API_KEY in a .env file at the repo root (gitignored);
+      # compose substitutes it here. Empty = LLM features stay disabled.
+      - LLM_PROVIDER=groq
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
     ports:
       - "8080:8080"
     depends_on:

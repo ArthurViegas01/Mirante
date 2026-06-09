@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lumni/mirante/internal/jobs"
+	"github.com/lumni/mirante/internal/llm"
 	"github.com/lumni/mirante/internal/monitor"
 	"github.com/lumni/mirante/internal/platform/auth"
 	"github.com/lumni/mirante/internal/platform/config"
@@ -83,6 +85,19 @@ func run() error {
 
 	subsSvc := subscriptions.NewService(subscriptions.NewSQLiteRepo(database))
 	subscriptions.RegisterRoutes(mux, authH.Protect, subsSvc)
+
+	// LLM gateway (ADR-0004). Absent key → unavailable client; features degrade.
+	var llmClient *llm.Client
+	if provider, ok := llm.NewProvider(cfg.LLMProvider, cfg.LLMModel, cfg.LLMAPIKey); ok {
+		llmClient = llm.NewClient(provider, llm.NewSQLiteLedger(database), llm.NewRouteLimiter(cfg.LLMRatePerMinute))
+		log.Info("llm enabled", "provider", provider.Name(), "model", provider.Model())
+	} else {
+		llmClient = llm.NewClient(nil, nil, nil)
+		log.Info("llm disabled (no API key)")
+	}
+
+	jobsSvc := jobs.NewService(jobs.NewSQLiteRepo(database), llmClient)
+	jobs.RegisterRoutes(mux, authH.Protect, jobsSvc)
 
 	monitorRepo := monitor.NewSQLiteRepo(database)
 	monitorMgr := monitor.NewManager(monitorRepo)
