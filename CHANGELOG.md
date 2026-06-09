@@ -10,8 +10,53 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### A fazer
-- F4 — Monitor avançado (rollups/pruning de `check_results`, multi-instância) e F5
-  (polish, observabilidade, RBAC).
+- Deploy real (Fly + Turso) e front hospedado; multi-usuário/RBAC quando houver
+  necessidade (ADR-0007). Multi-instância (Redis + leader election) segue adiada
+  (ADR-0002).
+
+## [0.7.0] - 2026-06-09
+
+F4 + F5 + prontidão de produção: rollups/pruning do Monitor, observabilidade OTLP,
+webhooks de alerta, signup do dono, banco hospedado (Turso/libSQL) e configuração
+de deploy (Fly.io).
+
+### Adicionado
+- **Observabilidade: OTLP traces (F5, ADR-0007).** O `internal/platform/otel`
+  deixou de ser no-op: com `OTEL_EXPORTER_OTLP_ENDPOINT` setada, a API exporta
+  traces via **OTLP/HTTP** (provider real do SDK, resource com `service.name`,
+  propagação W3C `traceparent`/baggage) e embrulha o handler raiz com `otelhttp`
+  (um span server por request, método/status como atributos). Sem endpoint, segue
+  no-op (zero overhead em dev/testes); falha no exporter degrada para no-op em vez
+  de derrubar o boot. **RBAC fica adiado** enquanto o app for single-user (ADR-0007).
+- **Webhooks de alerta (F5).** Cada transição de serviço do Monitor (up/degraded/
+  down) pode ser entregue a um endpoint externo: com `ALERT_WEBHOOK_URL` (http/https)
+  setada, a API faz `POST` JSON (evento, severidade, título legível, from/to, etc.)
+  a cada alerta, sobre a interface `AlertChannel`/`Notifier` que já existia (erros
+  isolados, timeout por chamada). A URL é do dono (confiável) — sem SSRF-guard,
+  diferente do import de vaga. Vazio = só o alerta in-app (sino). Sem migração.
+- **Deploy no Fly.io (config).** `apps/api/fly.toml` pronto para a API: máquina
+  única (hub SSE + scheduler + compactor são in-process — ADR-0002), healthcheck,
+  `force_https`, banco Turso hospedado (sem volume), segredos via `fly secrets`,
+  dono via signup. Seção **Deploy (Fly.io)** no README.
+- **Signup do dono + banco hospedado (prontidão para deploy).** O acesso deixa de
+  exigir o owner por env: se `OWNER_EMAIL` não for fornecido, a instância sobe sem
+  dono e o **primeiro acesso pela própria UI** reivindica a conta do dono
+  (`POST /api/auth/signup`, single-user — o cadastro fecha depois com
+  `ErrSignupClosed`; criação atômica via `CreateFirst` numa transação). Novo
+  `GET /api/auth/status` (`{needs_setup}`) deixa o SPA rotear o visitante anônimo
+  para `/signup` (página nova) vs `/login`; o guard do layout foi generalizado. O
+  bootstrap por env vira atalho de dev (idempotente, opcional). O banco já fala
+  **libSQL/Turso** por scheme (`DATABASE_URL=libsql://…` + `DATABASE_AUTH_TOKEN`) —
+  habilitando um deploy hospedado sem owner-por-env.
+- **Monitor: rollups horários + pruning (F4, ADR-0006).** O histórico bruto de
+  checks (`check_results`, ~1 linha/min por serviço) agora é compactado para não
+  crescer sem limite. Um worker horário (na inicialização e a cada hora) agrega os
+  checks mais antigos que `MONITOR_RETENTION_DAYS` (env, default 14) em buckets
+  horários (`check_rollups`, migração `0014`: `samples`/`ups`/`sum_latency_ms` por
+  serviço×hora) e **poda** as linhas brutas, numa única transação. O uptime
+  (24h/7d/30d) passa a somar rollups + brutos — disjuntos no tempo, **sem dupla
+  contagem nem perda** de amostras; a sparkline continua lendo os brutos recentes.
+  Multi-instância segue fora de escopo (ADR-0002: app single-instance).
 
 ## [0.6.0] - 2026-06-09
 
@@ -196,7 +241,8 @@ estrutura e artefatos de fundação.
   assinatura **Glow** (`#5EEAD4`) dos elementos "ao vivo" (`--color-live*`).
 - `README.md` (esqueleto) e este `CHANGELOG.md`.
 
-[Não lançado]: https://example.com/mirante/compare/v0.6.0...HEAD
+[Não lançado]: https://example.com/mirante/compare/v0.7.0...HEAD
+[0.7.0]: https://example.com/mirante/compare/v0.6.0...v0.7.0
 [0.6.0]: https://example.com/mirante/compare/v0.5.0...v0.6.0
 [0.5.0]: https://example.com/mirante/compare/v0.4.0...v0.5.0
 [0.4.0]: https://example.com/mirante/compare/v0.3.0...v0.4.0

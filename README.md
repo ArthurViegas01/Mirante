@@ -5,8 +5,10 @@
 >
 > _by Lumni_ — o irmão "solo" do Lumni Console.
 
-**Status:** `v0.6.0` — F0–F3 entregues: Projetos, Monitor (no projeto), Tarefas,
-Stacks & Custos, e Vagas/CV/CRM com IA (Groq). Ver [CHANGELOG.md](CHANGELOG.md).
+**Status:** `v0.7.0` — F0–F5 entregues: Projetos, Monitor (no projeto, com rollups/
+pruning), Tarefas, Stacks & Custos, Vagas/CV/CRM com IA (Groq), webhooks de alerta e
+observabilidade OTLP — além de prontidão de produção (signup do dono, banco Turso,
+deploy Fly). Ver [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -99,6 +101,11 @@ docker compose up --build       # sobe libSQL (sqld) + API + web (dev)
 # login de dev: owner@example.com / change-me-dev  (definido no compose)
 ```
 
+Em produção (sem `OWNER_EMAIL` no ambiente) a instância sobe **sem dono** e o
+**primeiro acesso pela UI** cria a conta do dono (signup, single-user; depois o
+cadastro fecha). Para experimentar o signup localmente, comente `OWNER_EMAIL`/
+`OWNER_PASSWORD` no `docker-compose.yml` e zere o volume (`docker compose down -v`).
+
 Sem Docker para o frontend:
 
 ```bash
@@ -116,6 +123,27 @@ make web-build    # build de produção do SvelteKit
 
 > Copie `.env.example` para `.env` para rodar a API fora do compose. Nenhum segredo
 > é versionado.
+
+## Deploy (Fly.io)
+
+Guia completo passo a passo em **[docs/DEPLOY.md](docs/DEPLOY.md)**. Resumo:
+
+A API tem um [`apps/api/fly.toml`](apps/api/fly.toml) pronto. **Uma única máquina**
+(`fly scale count 1`) — o hub SSE, o scheduler do Monitor e o compactor de rollups
+são in-process e pressupõem um só writer (ADR-0002). O banco é **Turso/libSQL**
+hospedado; não há volume.
+
+```bash
+cd apps/api
+fly launch --no-deploy            # cria o app (ou ajuste app/region no fly.toml)
+fly secrets set DATABASE_URL=libsql://<db>.turso.io DATABASE_AUTH_TOKEN=... \
+  APP_SECRET_KEY="$(openssl rand -base64 32)" WEB_ORIGIN=https://<web-host>
+fly deploy && fly scale count 1
+```
+
+O dono é criado no **primeiro acesso (signup)** — sem `OWNER_*` em produção. O
+frontend (SvelteKit, `adapter-node`) é publicado à parte (Fly, Vercel, etc.),
+apontando `API_URL`/`WEB_ORIGIN` para a API.
 
 ## Segurança
 

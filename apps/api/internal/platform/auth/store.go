@@ -70,6 +70,32 @@ func (s *UserStore) Create(ctx context.Context, u *User) error {
 	return err
 }
 
+// CreateFirst inserts u only if no user exists yet, atomically. The count and
+// insert run in one transaction; with the single-writer pool (MaxOpenConns=1)
+// the transaction holds the only connection, so a concurrent claim blocks and
+// then observes the owner. Returns ErrSignupClosed if an owner already exists.
+func (s *UserStore) CreateFirst(ctx context.Context, u *User) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var n int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return ErrSignupClosed
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)`,
+		u.ID, u.Email, nullable(u.Name), u.PasswordHash); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // GetByEmail looks up a user by email (case-insensitive).
 func (s *UserStore) GetByEmail(ctx context.Context, email string) (*User, error) {
 	row := s.db.QueryRowContext(ctx,

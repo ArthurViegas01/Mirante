@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"time"
 
 	idgen "github.com/lumni/mirante/internal/platform/id"
 	"github.com/lumni/mirante/internal/platform/validate"
@@ -221,6 +222,15 @@ func (m *Manager) SetEnabled(ctx context.Context, id ServiceID, enabled bool) (*
 	}
 	m.notifyReconcile()
 	return m.repo.GetService(ctx, id)
+}
+
+// Compact rolls up monitor checks older than the retention window into hourly
+// rollups and prunes the raw rows, bounding the time-series table while keeping
+// long-window uptime computable. The cutoff is floored to the hour so no hour is
+// split across rollups and surviving raw rows. Returns the number of rows pruned.
+func (m *Manager) Compact(ctx context.Context, retention time.Duration) (int, error) {
+	before := time.Now().UTC().Add(-retention).Truncate(time.Hour)
+	return m.repo.Compact(ctx, before)
 }
 
 // DeleteService removes a service and its history.

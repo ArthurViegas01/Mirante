@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/lumni/mirante/internal/applications"
 	"github.com/lumni/mirante/internal/cv"
 	"github.com/lumni/mirante/internal/jobs"
@@ -68,6 +70,9 @@ func run() error {
 	authSvc := auth.NewService(database.DB, cfg.SessionTTL)
 	if err := authSvc.Bootstrap(ctx, cfg.OwnerEmail, cfg.OwnerPassword, cfg.OwnerHash); err != nil {
 		return err
+	}
+	if needs, err := authSvc.NeedsSetup(ctx); err == nil && needs {
+		log.Info("no owner configured — the instance will be claimed via first-run signup")
 	}
 
 	authH := httpserver.NewAuthHandlers(authSvc, httpserver.AuthConfig{
@@ -128,7 +133,18 @@ func run() error {
 		}
 		return out, nil
 	})
-	monitorEngine := monitor.NewEngine(monitorRepo, monitor.NewChecker(), monitor.NewNotifier(log), hub, log)
+	// Optional external alert delivery (F5): an owner-configured webhook receives
+	// each monitor transition. Absent/invalid URL → no channel (in-app only).
+	var alertChannels []monitor.AlertChannel
+	if cfg.AlertWebhookURL != "" {
+		if ch, err := monitor.NewWebhookChannel(cfg.AlertWebhookURL, nil); err != nil {
+			log.Warn("invalid ALERT_WEBHOOK_URL — alert webhook disabled", "err", err)
+		} else {
+			alertChannels = append(alertChannels, ch)
+			log.Info("alert webhook enabled")
+		}
+	}
+	monitorEngine := monitor.NewEngine(monitorRepo, monitor.NewChecker(), monitor.NewNotifier(log, alertChannels...), hub, log)
 	monitorSched := monitor.NewScheduler(monitorRepo, monitorEngine, log, 8)
 	monitorMgr.SetReconciler(monitorSched)
 	monitor.RegisterRoutes(mux, authH.Protect, monitorMgr)
@@ -143,9 +159,14 @@ func run() error {
 		httpserver.RateLimit(ipLimiter),
 	)
 
+	// Outermost: an OTel server span per request (extracts trace context first;
+	// a no-op when no exporter is configured). Method/status land as attributes.
+	traced := otelhttp.NewHandler(handler, "http.server",
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return "HTTP " + r.Method }))
+
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           handler,
+		Handler:           traced,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -165,6 +186,34 @@ func run() error {
 				} else if n > 0 {
 					log.Info("swept expired sessions", "count", n)
 				}
+			}
+		}
+	}()
+
+	// Background: roll up old monitor checks into hourly buckets and prune the raw
+	// rows, keeping check_results bounded while long-window uptime stays computable
+	// (F4). Runs once on boot, then hourly until the context is cancelled.
+	compactDone := make(chan struct{})
+	go func() {
+		defer close(compactDone)
+		compact := func() {
+			if n, err := monitorMgr.Compact(ctx, cfg.MonitorRetention); err != nil {
+				if !errors.Is(err, context.Canceled) {
+					log.Warn("monitor compaction failed", "err", err)
+				}
+			} else if n > 0 {
+				log.Info("compacted monitor checks", "rows", n)
+			}
+		}
+		compact()
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				compact()
 			}
 		}
 	}()
@@ -190,6 +239,7 @@ func run() error {
 		err := srv.Shutdown(shutdownCtx)
 		monitorSched.Stop()
 		<-sweepDone
+		<-compactDone
 		return err
 	}
 }

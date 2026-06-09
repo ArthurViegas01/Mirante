@@ -241,17 +241,67 @@ func (r *sqliteRepo) ListChecks(ctx context.Context, id ServiceID, limit int) ([
 func (r *sqliteRepo) Uptime(ctx context.Context, id ServiceID, windowHours int) (Uptime, error) {
 	since := idb.FormatTime(time.Now().UTC().Add(-time.Duration(windowHours) * time.Hour))
 	var samples, ups int
-	err := r.db.QueryRowContext(ctx,
+	if err := r.db.QueryRowContext(ctx,
 		`SELECT COUNT(*), COALESCE(SUM(CASE WHEN outcome != 'down' THEN 1 ELSE 0 END), 0)
-		 FROM check_results WHERE service_id = ? AND checked_at >= ?`, string(id), since).Scan(&samples, &ups)
-	if err != nil {
+		 FROM check_results WHERE service_id = ? AND checked_at >= ?`, string(id), since).Scan(&samples, &ups); err != nil {
 		return Uptime{}, err
 	}
+
+	// Fold in compacted history. Rollup buckets cover raw rows the compactor has
+	// deleted, so they are disjoint from the raw rows counted above — summing both
+	// cannot double count. since[:13] is the window-start hour ('YYYY-MM-DDTHH'),
+	// matching the bucket format (substr of the canonical ISO timestamp).
+	var rSamples, rUps int
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(samples), 0), COALESCE(SUM(ups), 0)
+		 FROM check_rollups WHERE service_id = ? AND bucket >= ?`, string(id), since[:13]).Scan(&rSamples, &rUps); err != nil {
+		return Uptime{}, err
+	}
+	samples += rSamples
+	ups += rUps
+
 	u := Uptime{WindowHours: windowHours, Samples: samples}
 	if samples > 0 {
 		u.UpRatio = float64(ups) / float64(samples)
 	}
 	return u, nil
+}
+
+// Compact aggregates raw checks older than `before` into hourly rollups, then
+// prunes them. The UPSERT sums into any existing bucket, so re-running is safe;
+// because `before` is hour-aligned and time only moves forward, an already
+// compacted hour has no surviving raw rows to re-add.
+func (r *sqliteRepo) Compact(ctx context.Context, before time.Time) (int, error) {
+	cutoff := idb.FormatTime(before)
+	var pruned int
+	err := r.db.WithTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO check_rollups (service_id, bucket, samples, ups, sum_latency_ms)
+			 SELECT service_id, substr(checked_at, 1, 13),
+			        COUNT(*),
+			        COALESCE(SUM(CASE WHEN outcome != 'down' THEN 1 ELSE 0 END), 0),
+			        COALESCE(SUM(latency_ms), 0)
+			 FROM check_results WHERE checked_at < ?
+			 GROUP BY service_id, substr(checked_at, 1, 13)
+			 ON CONFLICT(service_id, bucket) DO UPDATE SET
+			     samples        = samples + excluded.samples,
+			     ups            = ups + excluded.ups,
+			     sum_latency_ms = sum_latency_ms + excluded.sum_latency_ms`,
+			cutoff); err != nil {
+			return err
+		}
+		res, err := tx.ExecContext(ctx, `DELETE FROM check_results WHERE checked_at < ?`, cutoff)
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		pruned = int(n)
+		return nil
+	})
+	return pruned, err
 }
 
 func (r *sqliteRepo) ListAlerts(ctx context.Context, limit int, unreadOnly bool) ([]Alert, error) {

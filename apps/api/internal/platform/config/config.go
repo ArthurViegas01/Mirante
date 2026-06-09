@@ -32,6 +32,9 @@ type Config struct {
 	LLMAPIKey        string
 	LLMRatePerMinute int
 
+	MonitorRetention time.Duration
+	AlertWebhookURL  string
+
 	OtelService  string
 	OtelEndpoint string
 }
@@ -42,20 +45,21 @@ func (c Config) IsProd() bool { return c.AppEnv == "production" }
 // Load reads and validates configuration from the environment.
 func Load() (Config, error) {
 	c := Config{
-		AppEnv:        env("APP_ENV", "development"),
-		HTTPAddr:      env("HTTP_ADDR", ":8080"),
-		WebOrigin:     env("WEB_ORIGIN", "http://localhost:5173"),
-		DatabaseURL:   env("DATABASE_URL", "file:./data/mirante.db"),
-		DatabaseToken: env("DATABASE_AUTH_TOKEN", ""),
-		SessionCookie: env("SESSION_COOKIE_NAME", "mirante_session"),
-		OwnerEmail:    env("OWNER_EMAIL", ""),
-		OwnerPassword: env("OWNER_PASSWORD", ""),
-		OwnerHash:     env("OWNER_PASSWORD_HASH", ""),
-		SecretKey:     env("APP_SECRET_KEY", ""),
-		LLMProvider:   env("LLM_PROVIDER", "groq"),
-		LLMModel:      env("LLM_MODEL", ""),
-		OtelService:   env("OTEL_SERVICE_NAME", "mirante-api"),
-		OtelEndpoint:  env("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+		AppEnv:          env("APP_ENV", "development"),
+		HTTPAddr:        env("HTTP_ADDR", ":8080"),
+		WebOrigin:       env("WEB_ORIGIN", "http://localhost:5173"),
+		DatabaseURL:     env("DATABASE_URL", "file:./data/mirante.db"),
+		DatabaseToken:   env("DATABASE_AUTH_TOKEN", ""),
+		SessionCookie:   env("SESSION_COOKIE_NAME", "mirante_session"),
+		OwnerEmail:      env("OWNER_EMAIL", ""),
+		OwnerPassword:   env("OWNER_PASSWORD", ""),
+		OwnerHash:       env("OWNER_PASSWORD_HASH", ""),
+		SecretKey:       env("APP_SECRET_KEY", ""),
+		LLMProvider:     env("LLM_PROVIDER", "groq"),
+		LLMModel:        env("LLM_MODEL", ""),
+		OtelService:     env("OTEL_SERVICE_NAME", "mirante-api"),
+		OtelEndpoint:    env("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+		AlertWebhookURL: env("ALERT_WEBHOOK_URL", ""),
 	}
 
 	// The API key is read generically (LLM_API_KEY) or from the provider's
@@ -83,6 +87,15 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("invalid LLM_RATE_PER_MINUTE: %w", err)
 	}
 	c.LLMRatePerMinute = rate
+
+	retentionDays, err := atoi(env("MONITOR_RETENTION_DAYS", "14"))
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid MONITOR_RETENTION_DAYS: %w", err)
+	}
+	if retentionDays < 1 {
+		return Config{}, errors.New("MONITOR_RETENTION_DAYS must be >= 1")
+	}
+	c.MonitorRetention = time.Duration(retentionDays) * 24 * time.Hour
 
 	if c.IsProd() {
 		if c.SecretKey == "" {
