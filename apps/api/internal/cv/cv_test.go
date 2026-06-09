@@ -128,3 +128,34 @@ func TestImportRequiresLLMAndText(t *testing.T) {
 	_, err = withLLM.ImportDraft(ctx, ImportInput{Text: "   "})
 	require.ErrorIs(t, err, ErrInvalid) // empty text checked first
 }
+
+func TestAdapt(t *testing.T) {
+	ctx := context.Background()
+	client := llm.NewClient(llm.NewMock(
+		`{"resumo_adaptado":"Engenheiro full-stack com foco em Go e cloud.",
+		  "pontos_fortes":["Go","Docker"],"lacunas":["Kubernetes"],"dica":"Destaque o projeto X."}`,
+	), nil, nil)
+	svc := newServiceLLM(t, client)
+	_, err := svc.SaveCV(ctx, CVInput{Titulo: "Dev", Skills: []string{"Go", "Docker"}})
+	require.NoError(t, err)
+
+	res, err := svc.Adapt(ctx, AdaptInput{
+		Titulo: "Backend Engineer", Descricao: "Go, Docker, Kubernetes",
+		Skills: []string{"Go", "Docker", "Kubernetes"},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, res.ResumoAdaptado)
+	require.Contains(t, res.PontosFortes, "Go")
+	require.Contains(t, res.Lacunas, "Kubernetes")
+	require.NotEmpty(t, res.Dica)
+}
+
+func TestAdaptRequiresLLMAndCV(t *testing.T) {
+	ctx := context.Background()
+	_, err := newService(t).Adapt(ctx, AdaptInput{Titulo: "X"})
+	require.ErrorIs(t, err, ErrLLMUnavailable) // nil client
+
+	withLLM := newServiceLLM(t, llm.NewClient(llm.NewMock("{}"), nil, nil))
+	_, err = withLLM.Adapt(ctx, AdaptInput{Titulo: "X", Descricao: "Go"})
+	require.ErrorIs(t, err, ErrInvalid) // empty CV
+}

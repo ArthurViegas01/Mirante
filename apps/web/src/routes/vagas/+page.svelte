@@ -32,6 +32,9 @@
 	let importFonte = $state('');
 
 	let enrichingId = $state('');
+	let adaptingId = $state('');
+	let adaptId = $state('');
+	let adaptResult = $state(null);
 
 	async function load() {
 		loading = true;
@@ -105,6 +108,27 @@
 			error = e.message;
 		} finally {
 			enrichingId = '';
+		}
+	}
+
+	async function adaptCV(job) {
+		adaptingId = job.id;
+		error = '';
+		try {
+			adaptResult = await api('/api/cv/adapt', {
+				method: 'POST',
+				body: {
+					titulo: job.titulo,
+					empresa: job.empresa,
+					descricao: job.descricao,
+					skills: job.skills
+				}
+			});
+			adaptId = job.id;
+		} catch (e) {
+			error = e.message;
+		} finally {
+			adaptingId = '';
 		}
 	}
 
@@ -216,8 +240,33 @@
 					<Button size="sm" variant="secondary" onclick={() => enrich(job)} disabled={enrichingId === job.id}>
 						{enrichingId === job.id ? 'Enriquecendo…' : '✨ Enriquecer com IA'}
 					</Button>
+					<Button size="sm" variant="secondary" onclick={() => adaptCV(job)} disabled={adaptingId === job.id}>
+						{adaptingId === job.id ? 'Adaptando…' : '🎯 Adaptar CV'}
+					</Button>
 					<button class="del" onclick={() => remove(job)}>Excluir</button>
 				</div>
+
+				{#if adaptId === job.id && adaptResult}
+					<div class="adapt">
+						<p class="adapt-label">Resumo adaptado para esta vaga</p>
+						<p class="adapt-resumo">{adaptResult.resumo_adaptado}</p>
+						<div class="adapt-cols">
+							{#if adaptResult.pontos_fortes?.length}
+								<div class="adapt-col">
+									<p class="adapt-label ok">Pontos fortes</p>
+									<ul>{#each adaptResult.pontos_fortes as p (p)}<li>{p}</li>{/each}</ul>
+								</div>
+							{/if}
+							{#if adaptResult.lacunas?.length}
+								<div class="adapt-col">
+									<p class="adapt-label gap">Lacunas</p>
+									<ul>{#each adaptResult.lacunas as l (l)}<li>{l}</li>{/each}</ul>
+								</div>
+							{/if}
+						</div>
+						{#if adaptResult.dica}<p class="adapt-dica">💡 {adaptResult.dica}</p>{/if}
+					</div>
+				{/if}
 			</article>
 		{/each}
 	</div>
@@ -422,5 +471,60 @@
 	}
 	.del:hover {
 		color: var(--color-danger-text);
+	}
+	.adapt {
+		margin-top: var(--space-3);
+		padding: var(--space-4);
+		border: var(--border-width-1) solid var(--color-border);
+		border-radius: var(--radius-md);
+		background-color: var(--color-surface-sunken);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+	.adapt-label {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--color-text-muted);
+		margin: 0;
+	}
+	.adapt-label.ok {
+		color: var(--color-success-text);
+	}
+	.adapt-label.gap {
+		color: var(--color-warning-text);
+	}
+	.adapt-resumo {
+		margin: 0;
+		font-family: var(--font-serif);
+		font-size: var(--text-base);
+		color: var(--color-text);
+		line-height: var(--leading-relaxed);
+	}
+	.adapt-cols {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--space-4);
+	}
+	.adapt-col ul {
+		margin: var(--space-1) 0 0;
+		padding-left: var(--space-4);
+		font-size: var(--text-sm);
+		color: var(--color-text-secondary);
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.adapt-dica {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--color-text-secondary);
+	}
+	@media (max-width: 640px) {
+		.adapt-cols {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>
