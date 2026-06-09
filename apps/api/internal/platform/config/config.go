@@ -32,6 +32,8 @@ type Config struct {
 	LLMAPIKey        string
 	LLMRatePerMinute int
 
+	MonitorRetention time.Duration
+
 	OtelService  string
 	OtelEndpoint string
 }
@@ -83,6 +85,15 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("invalid LLM_RATE_PER_MINUTE: %w", err)
 	}
 	c.LLMRatePerMinute = rate
+
+	retentionDays, err := atoi(env("MONITOR_RETENTION_DAYS", "14"))
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid MONITOR_RETENTION_DAYS: %w", err)
+	}
+	if retentionDays < 1 {
+		return Config{}, errors.New("MONITOR_RETENTION_DAYS must be >= 1")
+	}
+	c.MonitorRetention = time.Duration(retentionDays) * 24 * time.Hour
 
 	if c.IsProd() {
 		if c.SecretKey == "" {

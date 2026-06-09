@@ -169,6 +169,34 @@ func run() error {
 		}
 	}()
 
+	// Background: roll up old monitor checks into hourly buckets and prune the raw
+	// rows, keeping check_results bounded while long-window uptime stays computable
+	// (F4). Runs once on boot, then hourly until the context is cancelled.
+	compactDone := make(chan struct{})
+	go func() {
+		defer close(compactDone)
+		compact := func() {
+			if n, err := monitorMgr.Compact(ctx, cfg.MonitorRetention); err != nil {
+				if !errors.Is(err, context.Canceled) {
+					log.Warn("monitor compaction failed", "err", err)
+				}
+			} else if n > 0 {
+				log.Info("compacted monitor checks", "rows", n)
+			}
+		}
+		compact()
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				compact()
+			}
+		}
+	}()
+
 	monitorSched.Start(ctx)
 	log.Info("monitor scheduler started")
 
@@ -190,6 +218,7 @@ func run() error {
 		err := srv.Shutdown(shutdownCtx)
 		monitorSched.Stop()
 		<-sweepDone
+		<-compactDone
 		return err
 	}
 }

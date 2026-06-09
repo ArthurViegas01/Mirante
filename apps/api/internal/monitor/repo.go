@@ -45,6 +45,12 @@ type Repository interface {
 	ListChecks(ctx context.Context, id ServiceID, limit int) ([]CheckResult, error)
 	Uptime(ctx context.Context, id ServiceID, windowHours int) (Uptime, error)
 
+	// Compact rolls up every check_results row with checked_at < before into the
+	// hourly check_rollups table (summing on conflict) and then prunes those raw
+	// rows, in one transaction. Returns the number of raw rows pruned. `before`
+	// must be hour-aligned so no hour is split between rollups and surviving raw.
+	Compact(ctx context.Context, before time.Time) (int, error)
+
 	ListAlerts(ctx context.Context, limit int, unreadOnly bool) ([]Alert, error)
 	CountUnreadAlerts(ctx context.Context) (int, error)
 	MarkAlertRead(ctx context.Context, id int64) error
