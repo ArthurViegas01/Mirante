@@ -27,6 +27,7 @@ linters:
         - anual
         - protocolos
         - comandos
+        - profissional
     revive:
       rules:
         - name: exported

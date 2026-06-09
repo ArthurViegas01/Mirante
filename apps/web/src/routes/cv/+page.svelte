@@ -18,6 +18,10 @@
 	let error = $state('');
 	let saved = $state(false);
 
+	let importText = $state('');
+	let importing = $state(false);
+	let importError = $state('');
+
 	async function load() {
 		loading = true;
 		error = '';
@@ -50,6 +54,42 @@
 	}
 
 	onMount(load);
+
+	async function importCV() {
+		if (!importText.trim()) return;
+		importing = true;
+		importError = '';
+		try {
+			const d = await api('/api/cv/import', { method: 'POST', body: { text: importText } });
+			nome = d.nome || nome;
+			titulo = d.titulo || titulo;
+			tituloAlvo = d.titulo_alvo || tituloAlvo;
+			resumo = d.resumo || resumo;
+			if (d.skills?.length) skillsText = d.skills.join(', ');
+			if (d.experiences?.length) {
+				experiences = d.experiences.map((e) => ({
+					empresa: e.empresa,
+					cargo: e.cargo,
+					inicio: e.inicio,
+					fim: e.fim,
+					descricao: e.descricao
+				}));
+			}
+			if (d.education?.length) {
+				education = d.education.map((e) => ({
+					instituicao: e.instituicao,
+					curso: e.curso,
+					inicio: e.inicio,
+					fim: e.fim
+				}));
+			}
+			importText = '';
+		} catch (e) {
+			importError = e.message;
+		} finally {
+			importing = false;
+		}
+	}
 
 	const addExperience = () =>
 		experiences.push({ empresa: '', cargo: '', inicio: '', fim: '', descricao: '' });
@@ -92,6 +132,21 @@
 {#if loading}
 	<p class="muted">Carregando…</p>
 {:else}
+	<section class="panel import">
+		<h2>Importar de um texto</h2>
+		<p class="muted">
+			Cole seu CV (ou inventário de skills) — a IA estrutura identidade, skills, experiências e
+			educação. Revise e salve.
+		</p>
+		<textarea bind:value={importText} rows="5" placeholder="Cole aqui o texto do seu CV…"></textarea>
+		{#if importError}<p class="error">{importError}</p>{/if}
+		<div class="actions">
+			<Button variant="secondary" onclick={importCV} disabled={importing || !importText.trim()}>
+				{importing ? 'Estruturando…' : '✨ Estruturar com IA'}
+			</Button>
+		</div>
+	</section>
+
 	<form onsubmit={save}>
 		<section class="panel">
 			<h2>Identidade</h2>

@@ -40,6 +40,9 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   faltantes — base determinística do match (refino por LLM virá com as experiências).
 - **CV mestre: experiências e educação** geríveis na página `/cv` (listas com add/remover),
   persistidas via `PUT /api/cv` (migração `0011`, replace atômico, ids no servidor).
+- **Import de CV por texto:** `POST /api/cv/import` usa o LLM para estruturar um CV (ou
+  inventário de skills) colado em {identidade, resumo, skills, experiências, educação};
+  a `/cv` preenche o formulário p/ revisão. Validado ao vivo com um CV real (Groq).
 
 ### Alterado
 - **Monitor agora é centrado no projeto:** a aba Monitor saiu da sidebar; o status ao
@@ -58,7 +61,7 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   (`PUT /api/profile` virou update parcial — `skills` opcional).
 
 ### A fazer
-- F3 — `cv`: **adaptação por vaga via LLM** e **export PDF+DOCX** pure-Go; refino de
+- F3 — `cv`: **export PDF+DOCX** pure-Go e **adaptação por vaga via LLM**; refino de
   aderência por LLM; e CRM de candidaturas em `internal/applications`.
 
 ## [0.5.0] - 2026-06-08
