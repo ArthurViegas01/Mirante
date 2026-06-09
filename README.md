@@ -122,6 +122,25 @@ make web-build    # build de produção do SvelteKit
 > Copie `.env.example` para `.env` para rodar a API fora do compose. Nenhum segredo
 > é versionado.
 
+## Deploy (Fly.io)
+
+A API tem um [`apps/api/fly.toml`](apps/api/fly.toml) pronto. **Uma única máquina**
+(`fly scale count 1`) — o hub SSE, o scheduler do Monitor e o compactor de rollups
+são in-process e pressupõem um só writer (ADR-0002). O banco é **Turso/libSQL**
+hospedado; não há volume.
+
+```bash
+cd apps/api
+fly launch --no-deploy            # cria o app (ou ajuste app/region no fly.toml)
+fly secrets set DATABASE_URL=libsql://<db>.turso.io DATABASE_AUTH_TOKEN=... \
+  APP_SECRET_KEY="$(openssl rand -base64 32)" WEB_ORIGIN=https://<web-host>
+fly deploy && fly scale count 1
+```
+
+O dono é criado no **primeiro acesso (signup)** — sem `OWNER_*` em produção. O
+frontend (SvelteKit, `adapter-node`) é publicado à parte (Fly, Vercel, etc.),
+apontando `API_URL`/`WEB_ORIGIN` para a API.
+
 ## Segurança
 
 Segredos só via env; CORS restrito; headers de segurança; validação/sanitização
