@@ -9,8 +9,17 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 
 ## [Não lançado]
 
+### Adicionado
+- **Kernel `internal/skills`** (fundação da F3): vocabulário canônico de skills com
+  sinônimos/ontologia de categorias em dados Go in-code (sem banco, sem HTTP, sem
+  dependências). API determinística — `Normalize(raw)` resolve um token para a skill
+  canônica e `Match(texto)` extrai as skills mencionadas em texto livre (boundary-aware,
+  trata `C#`/`C++`/`.NET`/multi-palavra). É o piso do cálculo de aderência (jobs/cv).
+
 ### A fazer
-- F3 — Vagas, CV e CRM (sobre o kernel `internal/skills`).
+- F3 — Vagas, CV e CRM sobre o kernel `skills`: aderência via LLM (ADR-0004), export de
+  CV (PDF/DOCX) e CRM de candidaturas. Decisões pendentes: provider de LLM + env keys,
+  libs pure-Go de PDF/DOCX.
 
 ## [0.5.0] - 2026-06-08
 
