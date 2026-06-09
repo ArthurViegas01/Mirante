@@ -2,23 +2,35 @@ package jobs
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/lumni/mirante/internal/llm"
 	idb "github.com/lumni/mirante/internal/platform/db"
+	"github.com/lumni/mirante/internal/platform/httpx"
 	"github.com/lumni/mirante/internal/platform/migrate"
 )
 
 func newService(t *testing.T, client *llm.Client) *Service {
+	return newServiceFetch(t, client, nil)
+}
+
+func newServiceFetch(t *testing.T, client *llm.Client, fetcher *httpx.Fetcher) *Service {
 	t.Helper()
 	ctx := context.Background()
 	database, err := idb.Open(ctx, ":memory:", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = database.Close() })
 	require.NoError(t, migrate.Up(database.DB))
-	return NewService(NewSQLiteRepo(database), client)
+	return NewService(NewSQLiteRepo(database), client, fetcher)
+}
+
+// localFetcher allows private IPs so tests can hit an httptest server on loopback.
+func localFetcher() *httpx.Fetcher {
+	return httpx.NewFetcher(httpx.Policy{AllowPrivateIPs: true, MaxBodyBytes: 1 << 20})
 }
 
 func TestCreateExtractsSkills(t *testing.T) {
@@ -109,4 +121,70 @@ func TestList(t *testing.T) {
 	all, err := svc.List(ctx)
 	require.NoError(t, err)
 	require.Len(t, all, 2)
+}
+
+const jsonLDPage = `<html><head>
+<script type="application/ld+json">
+{"@context":"https://schema.org/","@type":"JobPosting","title":"Engenheiro de Software",
+"description":"<p>Trabalhar com <strong>Go</strong>, React e PostgreSQL.</p>",
+"hiringOrganization":{"@type":"Organization","name":"Acme"},
+"jobLocation":{"@type":"Place","address":{"@type":"PostalAddress","addressLocality":"Porto Alegre","addressRegion":"RS"}},
+"jobLocationType":"TELECOMMUTE"}
+</script></head><body>página com ruído</body></html>`
+
+func htmlServer(t *testing.T, body string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestImportDraftJSONLD(t *testing.T) {
+	srv := htmlServer(t, jsonLDPage)
+	svc := newServiceFetch(t, nil, localFetcher())
+
+	d, err := svc.ImportDraft(context.Background(), srv.URL)
+	require.NoError(t, err)
+	require.Equal(t, "json-ld", d.Fonte)
+	require.Equal(t, "Engenheiro de Software", d.Titulo)
+	require.Equal(t, "Acme", d.Empresa)
+	require.Equal(t, ModeloRemoto, d.Modelo)
+	require.Equal(t, "Porto Alegre, RS", d.Localizacao)
+	require.Contains(t, d.Descricao, "Go")
+	require.ElementsMatch(t, []string{"Go", "React", "PostgreSQL"}, d.Skills)
+}
+
+func TestImportDraftLLMFallback(t *testing.T) {
+	srv := htmlServer(t, `<html><body><h1>Vaga</h1><p>Backend com Go e Docker</p></body></html>`)
+	client := llm.NewClient(llm.NewMock(
+		`{"titulo":"Dev Backend","empresa":"Beta","descricao":"Backend com Go e Docker","localizacao":"Remoto","modelo":"remoto","senioridade":"pleno"}`,
+	), nil, nil)
+	svc := newServiceFetch(t, client, localFetcher())
+
+	d, err := svc.ImportDraft(context.Background(), srv.URL)
+	require.NoError(t, err)
+	require.Equal(t, "llm", d.Fonte)
+	require.Equal(t, "Dev Backend", d.Titulo)
+	require.Equal(t, ModeloRemoto, d.Modelo)
+	require.ElementsMatch(t, []string{"Go", "Docker"}, d.Skills)
+}
+
+func TestImportFailedNoSource(t *testing.T) {
+	srv := htmlServer(t, `<html><body><p>página sem dados estruturados</p></body></html>`)
+	svc := newServiceFetch(t, nil, localFetcher()) // no LLM, no JSON-LD
+	_, err := svc.ImportDraft(context.Background(), srv.URL)
+	require.ErrorIs(t, err, ErrImportFailed)
+}
+
+func TestImportUnavailableAndBadURL(t *testing.T) {
+	noFetcher := newService(t, nil)
+	_, err := noFetcher.ImportDraft(context.Background(), "https://example.com/job")
+	require.ErrorIs(t, err, ErrImportUnavailable)
+
+	withFetcher := newServiceFetch(t, nil, localFetcher())
+	_, err = withFetcher.ImportDraft(context.Background(), "not-a-url")
+	require.ErrorIs(t, err, ErrInvalid)
 }

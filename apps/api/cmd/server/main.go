@@ -18,6 +18,7 @@ import (
 	"github.com/lumni/mirante/internal/platform/config"
 	"github.com/lumni/mirante/internal/platform/db"
 	"github.com/lumni/mirante/internal/platform/httpserver"
+	"github.com/lumni/mirante/internal/platform/httpx"
 	"github.com/lumni/mirante/internal/platform/logging"
 	"github.com/lumni/mirante/internal/platform/migrate"
 	"github.com/lumni/mirante/internal/platform/otel"
@@ -96,7 +97,14 @@ func run() error {
 		log.Info("llm disabled (no API key)")
 	}
 
-	jobsSvc := jobs.NewService(jobs.NewSQLiteRepo(database), llmClient)
+	// Job-link import uses the SSRF-guarded JobLink policy (ADR-0003): private IPs
+	// blocked, with a browser-like UA to read public postings (e.g. LinkedIn).
+	jobLinkFetcher := httpx.NewFetcher(httpx.Policy{
+		AllowPrivateIPs: false,
+		MaxBodyBytes:    1 << 20,
+		UserAgent:       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+	})
+	jobsSvc := jobs.NewService(jobs.NewSQLiteRepo(database), llmClient, jobLinkFetcher)
 	jobs.RegisterRoutes(mux, authH.Protect, jobsSvc)
 
 	monitorRepo := monitor.NewSQLiteRepo(database)

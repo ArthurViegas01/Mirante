@@ -25,6 +25,10 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   descrição via `skills.Match`; `POST /api/jobs/{id}/enrich` usa o LLM para preencher
   empresa/senioridade/modelo/resumo. UI em `/vagas` (lista, cadastro colando a descrição,
   botão "Enriquecer com IA"). O compose repassa `GROQ_API_KEY` (de um `.env` na raiz).
+- **Import de vaga por link:** `POST /api/jobs/import` busca a URL (fetch SSRF-guard,
+  ADR-0003, UA de browser) e extrai os campos do JSON-LD `JobPosting` que LinkedIn e
+  boards embutem (com fallback por LLM quando ausente). Na UI de `/vagas`, colar o link
+  preenche o formulário automaticamente (título, empresa, local, descrição, modelo).
 
 ### A fazer
 - F3 — `cv` (CV mestre, adaptação por vaga via LLM, export **PDF+DOCX** pure-Go) com

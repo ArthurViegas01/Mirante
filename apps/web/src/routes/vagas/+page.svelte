@@ -21,6 +21,10 @@
 	let saving = $state(false);
 	let formError = $state('');
 
+	let importing = $state(false);
+	let importError = $state('');
+	let importFonte = $state('');
+
 	let enrichingId = $state('');
 
 	async function load() {
@@ -41,7 +45,28 @@
 	function resetForm() {
 		titulo = empresa = descricao = url = localizacao = senioridade = '';
 		modelo = 'indefinido';
-		formError = '';
+		formError = importError = importFonte = '';
+	}
+
+	async function importLink() {
+		if (!url) return;
+		importing = true;
+		importError = '';
+		importFonte = '';
+		try {
+			const d = await api('/api/jobs/import', { method: 'POST', body: { url } });
+			titulo = d.titulo || titulo;
+			empresa = d.empresa || empresa;
+			descricao = d.descricao || descricao;
+			localizacao = d.localizacao || localizacao;
+			senioridade = d.senioridade || senioridade;
+			if (d.modelo && d.modelo !== 'indefinido') modelo = d.modelo;
+			importFonte = d.fonte;
+		} catch (e) {
+			importError = e.message;
+		} finally {
+			importing = false;
+		}
 	}
 
 	async function create(e) {
@@ -99,13 +124,28 @@
 
 {#if showForm}
 	<form class="panel form" onsubmit={create}>
+		<div class="import-row">
+			<Input
+				label="Link da vaga (LinkedIn, etc.) — preenche o formulário automaticamente"
+				type="url"
+				bind:value={url}
+				placeholder="https://www.linkedin.com/jobs/view/…"
+			/>
+			<div class="import-btn">
+				<Button variant="secondary" onclick={importLink} disabled={importing || !url}>
+					{importing ? 'Buscando…' : 'Buscar do link'}
+				</Button>
+			</div>
+		</div>
+		{#if importError}<p class="error">{importError}</p>{/if}
+		{#if importFonte}<p class="hint">Preenchido a partir do link (via {importFonte}). Confira e ajuste antes de salvar.</p>{/if}
+
 		<div class="grid">
 			<Input label="Título / cargo" bind:value={titulo} required />
 			<Input label="Empresa" bind:value={empresa} />
 			<Select label="Modelo" bind:value={modelo} options={MODELO_OPTIONS} />
 			<Input label="Senioridade" bind:value={senioridade} placeholder="júnior, pleno…" />
 			<Input label="Localização" bind:value={localizacao} />
-			<Input label="Link" type="url" bind:value={url} placeholder="https://…" />
 		</div>
 		<label class="field">
 			<span class="label">Descrição (cole o texto da vaga — as skills são extraídas daqui)</span>
@@ -243,6 +283,20 @@
 	.actions {
 		display: flex;
 		justify-content: flex-end;
+	}
+	.import-row {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		gap: var(--space-3);
+		align-items: end;
+	}
+	.import-btn {
+		display: flex;
+	}
+	.hint {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--color-accent);
 	}
 	.empty {
 		padding: var(--space-8);
