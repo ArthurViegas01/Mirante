@@ -7,7 +7,7 @@ import (
 	"github.com/lumni/mirante/internal/platform/respond"
 )
 
-const maxBody = 16 << 10
+const maxBody = 128 << 10 // a full CV (experiences/education) can be large
 
 type handlers struct{ svc *Service }
 
@@ -18,6 +18,7 @@ func RegisterRoutes(mux *http.ServeMux, protect func(http.Handler) http.Handler,
 	h := &handlers{svc: svc}
 	mux.Handle("GET /api/profile", protect(http.HandlerFunc(h.get)))
 	mux.Handle("PUT /api/profile", protect(http.HandlerFunc(h.save)))
+	mux.Handle("PUT /api/cv", protect(http.HandlerFunc(h.saveCV)))
 }
 
 func (h *handlers) get(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +37,20 @@ func (h *handlers) save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, err := h.svc.SaveProfile(r.Context(), in)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	respond.JSON(w, http.StatusOK, p)
+}
+
+func (h *handlers) saveCV(w http.ResponseWriter, r *http.Request) {
+	var in CVInput
+	if err := respond.Decode(w, r, &in, maxBody); err != nil {
+		respond.Error(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	p, err := h.svc.SaveCV(r.Context(), in)
 	if err != nil {
 		writeErr(w, err)
 		return

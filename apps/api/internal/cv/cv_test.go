@@ -25,53 +25,67 @@ func TestProfileEmptyByDefault(t *testing.T) {
 	p, err := newService(t).GetProfile(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, "", p.Titulo)
-	require.Equal(t, "", p.TituloAlvo)
+	require.Empty(t, p.Skills)
+	require.Empty(t, p.Experiences)
+	require.Empty(t, p.Education)
 }
 
-func TestProfileUpsert(t *testing.T) {
+func TestSaveCVFull(t *testing.T) {
 	ctx := context.Background()
 	svc := newService(t)
 
-	p, err := svc.SaveProfile(ctx, ProfileInput{Titulo: "Dev Backend", TituloAlvo: "Staff Engineer"})
+	p, err := svc.SaveCV(ctx, CVInput{
+		Nome: "Arthur", Titulo: "Dev Backend", TituloAlvo: "Staff Engineer",
+		Skills: []string{"golang", "React", "react"}, // → Go, React (canonical, deduped)
+		Experiences: []ExperienceInput{
+			{Empresa: "Acme", Cargo: "Backend", Inicio: "2022", Fim: "atual", Descricao: "Go e PostgreSQL"},
+			{Empresa: "", Cargo: "", Descricao: ""}, // blank row → skipped
+		},
+		Education: []EducationInput{
+			{Instituicao: "UFRGS", Curso: "Ciência da Computação", Inicio: "2016", Fim: "2021"},
+		},
+	})
 	require.NoError(t, err)
-	require.Equal(t, "Dev Backend", p.Titulo)
-	require.Equal(t, "Staff Engineer", p.TituloAlvo)
+	require.Equal(t, []string{"Go", "React"}, p.Skills)
+	require.Len(t, p.Experiences, 1)
+	require.Equal(t, "Acme", p.Experiences[0].Empresa)
+	require.NotEmpty(t, p.Experiences[0].ID)
+	require.Len(t, p.Education, 1)
+	require.Equal(t, "UFRGS", p.Education[0].Instituicao)
 
 	got, err := svc.GetProfile(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "Staff Engineer", got.TituloAlvo)
-
-	// A second save overwrites the same singleton row.
-	_, err = svc.SaveProfile(ctx, ProfileInput{Titulo: "Dev Pleno"})
-	require.NoError(t, err)
-	got2, _ := svc.GetProfile(ctx)
-	require.Equal(t, "Dev Pleno", got2.Titulo)
-	require.Equal(t, "", got2.TituloAlvo) // cleared
+	require.Len(t, got.Experiences, 1)
+	require.Len(t, got.Education, 1)
 }
 
-func TestProfileValidation(t *testing.T) {
-	_, err := newService(t).SaveProfile(context.Background(), ProfileInput{Titulo: strings.Repeat("x", 121)})
-	require.ErrorIs(t, err, ErrInvalid)
-}
-
-func TestProfileSkills(t *testing.T) {
+func TestSaveProfilePreservesSkillsAndCV(t *testing.T) {
 	ctx := context.Background()
 	svc := newService(t)
 
-	// golang→Go (canonical), "react"/"React" dedup, blank skipped, unknown kept.
-	p, err := svc.SaveProfile(ctx, ProfileInput{
-		Titulo: "Dev",
-		Skills: []string{"golang", "React", "react", "Salesforce", "  "},
+	_, err := svc.SaveCV(ctx, CVInput{
+		Titulo: "Dev", Skills: []string{"Go", "Docker"},
+		Experiences: []ExperienceInput{{Empresa: "Acme", Cargo: "Eng"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, []string{"Go", "React", "Salesforce"}, p.Skills) // returned sorted
 
-	got, err := svc.GetProfile(ctx)
+	// Partial identity update (no skills) must preserve skills AND experiences —
+	// this is the header quick-edit path that previously wiped skills.
+	p, err := svc.SaveProfile(ctx, ProfileInput{Titulo: "Senior Dev"})
 	require.NoError(t, err)
-	require.Equal(t, []string{"Go", "React", "Salesforce"}, got.Skills)
+	require.Equal(t, "Senior Dev", p.Titulo)
+	require.Equal(t, []string{"Docker", "Go"}, p.Skills) // sorted, preserved
+	require.Len(t, p.Experiences, 1)
 
-	// Re-saving replaces the whole set.
-	p2, err := svc.SaveProfile(ctx, ProfileInput{Titulo: "Dev", Skills: []string{"Python"}})
+	// An explicit skills pointer DOES replace them.
+	replacement := []string{"Python"}
+	p2, err := svc.SaveProfile(ctx, ProfileInput{Titulo: "Senior Dev", Skills: &replacement})
 	require.NoError(t, err)
 	require.Equal(t, []string{"Python"}, p2.Skills)
+}
+
+func TestProfileValidation(t *testing.T) {
+	_, err := newService(t).SaveCV(context.Background(), CVInput{Titulo: strings.Repeat("x", 121)})
+	require.ErrorIs(t, err, ErrInvalid)
 }
