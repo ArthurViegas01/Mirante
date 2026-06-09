@@ -5,6 +5,8 @@
 	import Input from '$lib/components/Input.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import ProjectStacks from '$lib/components/ProjectStacks.svelte';
+	import ProjectCosts from '$lib/components/ProjectCosts.svelte';
 	import { api } from '$lib/api.js';
 	import { STATUS, STATUS_OPTIONS, LINK_KINDS } from '$lib/projectStatus.js';
 	import { STATUS as TASK_STATUS, isOverdue, prazoLabel } from '$lib/taskMeta.js';
@@ -150,6 +152,10 @@
 		</form>
 		{#if linkError}<p class="error">{linkError}</p>{/if}
 	</section>
+
+	<ProjectStacks {id} />
+
+	<ProjectCosts {id} />
 
 	<section class="panel">
 		<div class="panel-head">
