@@ -34,6 +34,20 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   `/vagas` mostra a **profissão atual e a almejada** (editável inline) — fundação do
   CV mestre que cresce na sequência (experiências, adaptação por vaga, export PDF/DOCX).
 
+### Alterado
+- **Monitor agora é centrado no projeto:** a aba Monitor saiu da sidebar; o status ao
+  vivo de cada serviço (front/back/banco) aparece na seção **Stacks** ao abrir um
+  projeto, agora com **sparkline de latência, uptime (24h/7d/30d) e pausar/excluir**
+  inline (cards expansíveis). Alertas seguem na central de notificações (sino). As
+  rotas `/monitor` foram removidas; os endpoints `/api/services*` permanecem.
+
+### Corrigido
+- **Dark mode:** header de tabela (Projetos), colunas do kanban (Tarefas) e hover de
+  botões usavam cores sempre-claras; agora usam o role token `--color-surface-sunken`
+  e respeitam o tema.
+- **Import de vaga por link:** a descrição vinha resumida; agora devolve o texto
+  completo da vaga (prompt ajustado + limites de entrada/saída maiores).
+
 ### A fazer
 - F3 — `cv` (CV mestre, adaptação por vaga via LLM, export **PDF+DOCX** pure-Go) com
   aderência vaga↔CV, e CRM de candidaturas em `internal/applications`.

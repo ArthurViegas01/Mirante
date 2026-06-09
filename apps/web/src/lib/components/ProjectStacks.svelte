@@ -3,11 +3,14 @@
 	import Input from '$lib/components/Input.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import Sparkline from '$lib/components/Sparkline.svelte';
+	import ProgressBar from '$lib/components/ProgressBar.svelte';
 	import { api } from '$lib/api.js';
 	import { monitor } from '$lib/stores/monitor.svelte.js';
 	import {
 		svcVariant,
 		svcLabel,
+		uptimeVariant,
 		KIND_OPTIONS,
 		CAMADA_OPTIONS,
 		CAMADA_ORDER,
@@ -29,6 +32,11 @@
 	let saving = $state(false);
 	let formError = $state('');
 
+	// Inline detail of the expanded service (folded in from the old Monitor page).
+	let expandedId = $state('');
+	let detail = $state(null);
+	let detailLoading = $state(false);
+
 	// Group services by camada in display order; empty camada falls last.
 	let groups = $derived.by(() => {
 		const map = {};
@@ -37,6 +45,10 @@
 			.filter((k) => map[k]?.length)
 			.map((k) => ({ camada: k, items: map[k] }));
 	});
+
+	let points = $derived(
+		detail ? detail.checks.slice().reverse().map((c) => c.latency_ms || 0) : []
+	);
 
 	async function load() {
 		loading = true;
@@ -63,6 +75,56 @@
 		services = services.map((s) => (s.id === ev.service_id ? { ...s, current_status: ev.to } : s));
 	});
 
+	async function loadDetail(id) {
+		detail = null;
+		detailLoading = true;
+		try {
+			detail = await api(`/api/services/${id}`);
+		} catch (e) {
+			error = e.message;
+		} finally {
+			detailLoading = false;
+		}
+	}
+
+	function toggle(s) {
+		if (expandedId === s.id) {
+			expandedId = '';
+			detail = null;
+		} else {
+			expandedId = s.id;
+			loadDetail(s.id);
+		}
+	}
+
+	function pct(u) {
+		return u.samples > 0 ? `${(u.up_ratio * 100).toFixed(1)}%` : 'sem dados';
+	}
+
+	async function toggleEnabled(s) {
+		try {
+			await api(`/api/services/${s.id}/enabled`, { method: 'POST', body: { enabled: !s.enabled } });
+			await load();
+			if (expandedId === s.id) await loadDetail(s.id);
+		} catch (e) {
+			error = e.message;
+		}
+	}
+
+	async function removeSvc(s) {
+		if (!confirm(`Excluir o serviço "${s.nome}" e seu histórico?`)) return;
+		try {
+			await api(`/api/services/${s.id}`, { method: 'DELETE' });
+			if (expandedId === s.id) {
+				expandedId = '';
+				detail = null;
+			}
+			await load();
+		} catch (e) {
+			error = e.message;
+		}
+	}
+
 	async function create(e) {
 		e.preventDefault();
 		saving = true;
@@ -88,12 +150,9 @@
 <section class="panel">
 	<div class="panel-head">
 		<h2>Stacks</h2>
-		<div class="head-actions">
-			<a class="muted-link" href="/monitor">Monitor →</a>
-			<Button size="sm" variant="secondary" onclick={() => (showForm = !showForm)}>
-				{showForm ? 'Cancelar' : 'Adicionar serviço'}
-			</Button>
-		</div>
+		<Button size="sm" variant="secondary" onclick={() => (showForm = !showForm)}>
+			{showForm ? 'Cancelar' : 'Adicionar serviço'}
+		</Button>
 	</div>
 
 	{#if showForm}
@@ -125,9 +184,10 @@
 					<p class="camada">{camadaLabel(g.camada)}</p>
 					<ul class="svcs">
 						{#each g.items as s (s.id)}
-							<li>
-								<a class="svc" href={`/monitor/${s.id}`}>
+							<li class:open={expandedId === s.id}>
+								<button class="svc" onclick={() => toggle(s)} aria-expanded={expandedId === s.id}>
 									<span class="svc-main">
+										<span class="chevron" class:rot={expandedId === s.id} aria-hidden="true">›</span>
 										<span class="svc-nome">{s.nome}</span>
 										{#if s.provider}<span class="svc-prov">{s.provider}</span>{/if}
 									</span>
@@ -135,7 +195,32 @@
 										status={s.enabled ? svcVariant(s.current_status) : 'info'}
 										label={s.enabled ? svcLabel(s.current_status) : 'Pausado'}
 									/>
-								</a>
+								</button>
+
+								{#if expandedId === s.id}
+									<div class="detail">
+										{#if detailLoading && !detail}
+											<p class="muted small">Carregando…</p>
+										{:else if detail}
+											<p class="mono target">{detail.service.kind} · {detail.service.target}</p>
+											<Sparkline {points} />
+											<div class="uptime">
+												{#each [['24h', detail.uptime_24h], ['7d', detail.uptime_7d], ['30d', detail.uptime_30d]] as [label, u] (label)}
+													<div class="up">
+														<div class="up-head"><span>{label}</span><span class="mono">{pct(u)}</span></div>
+														<ProgressBar value={u.up_ratio} variant={uptimeVariant(u.up_ratio)} />
+													</div>
+												{/each}
+											</div>
+											<div class="detail-actions">
+												<Button size="sm" variant="secondary" onclick={() => toggleEnabled(s)}>
+													{s.enabled ? 'Pausar' : 'Retomar'}
+												</Button>
+												<button class="del" onclick={() => removeSvc(s)}>Excluir</button>
+											</div>
+										{/if}
+									</div>
+								{/if}
 							</li>
 						{/each}
 					</ul>
@@ -160,17 +245,6 @@
 		justify-content: space-between;
 		gap: var(--space-4);
 		margin-bottom: var(--space-4);
-	}
-	.head-actions {
-		display: flex;
-		align-items: center;
-		gap: var(--space-3);
-	}
-	.muted-link {
-		font-size: var(--text-sm);
-		color: var(--color-link);
-		text-decoration: none;
-		white-space: nowrap;
 	}
 	h2 {
 		font-size: var(--text-lg);
@@ -212,25 +286,44 @@
 		flex-direction: column;
 		gap: var(--space-2);
 	}
+	.svcs li {
+		border: var(--border-width-1) solid var(--color-border);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+	}
+	.svcs li.open {
+		border-color: var(--color-border-strong);
+	}
 	.svc {
+		width: 100%;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--space-3);
 		padding: 10px 12px;
-		border: var(--border-width-1) solid var(--color-border);
-		border-radius: var(--radius-md);
-		text-decoration: none;
-		transition: border-color var(--dur-fast) var(--ease-out);
+		background: none;
+		border: none;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+		color: var(--color-text);
 	}
 	.svc:hover {
-		border-color: var(--color-border-strong);
+		background-color: var(--color-surface-sunken);
 	}
 	.svc-main {
 		display: flex;
 		align-items: baseline;
 		gap: var(--space-2);
 		min-width: 0;
+	}
+	.chevron {
+		font-family: var(--font-mono);
+		color: var(--color-text-muted);
+		transition: transform var(--dur-fast) var(--ease-out);
+	}
+	.chevron.rot {
+		transform: rotate(90deg);
 	}
 	.svc-nome {
 		font-weight: var(--weight-medium);
@@ -241,9 +334,59 @@
 		font-size: 11px;
 		color: var(--color-text-muted);
 	}
+	.detail {
+		padding: var(--space-3) var(--space-4) var(--space-4);
+		border-top: var(--border-width-1) solid var(--color-divider);
+		background-color: var(--color-surface-sunken);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+	.target {
+		margin: 0;
+		font-size: 12px;
+		color: var(--color-text-muted);
+		word-break: break-all;
+	}
+	.mono {
+		font-family: var(--font-mono);
+	}
+	.uptime {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+	.up-head {
+		display: flex;
+		justify-content: space-between;
+		font-size: 12px;
+		color: var(--color-text-secondary);
+		margin-bottom: 4px;
+	}
+	.detail-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		margin-top: var(--space-1);
+	}
+	.del {
+		margin-left: auto;
+		background: none;
+		border: none;
+		color: var(--color-text-muted);
+		font-size: var(--text-sm);
+		cursor: pointer;
+	}
+	.del:hover {
+		color: var(--color-danger-text);
+	}
 	.muted {
 		color: var(--color-text-secondary);
 		font-size: var(--text-sm);
+	}
+	.muted.small {
+		font-size: 12px;
+		margin: 0;
 	}
 	.error {
 		color: var(--color-danger-text);
