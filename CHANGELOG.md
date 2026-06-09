@@ -15,11 +15,16 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   dependências). API determinística — `Normalize(raw)` resolve um token para a skill
   canônica e `Match(texto)` extrai as skills mencionadas em texto livre (boundary-aware,
   trata `C#`/`C++`/`.NET`/multi-palavra). É o piso do cálculo de aderência (jobs/cv).
+- **Gateway LLM `internal/llm`** (ADR-0004): provider único por env (default **Groq**,
+  OpenAI-compatible), sem failover. `Client` aplica rate-limit por rota e grava todo
+  uso num ledger (`llm_usage`, migração `0007`); `CompleteJSON` pede saída JSON e valida
+  por unmarshal no tipo do chamador. Provider `mock` para dev sem key (a API sobe e as
+  features de LLM degradam). Keys: `LLM_API_KEY`/`GROQ_API_KEY` etc.
 
 ### A fazer
-- F3 — Vagas, CV e CRM sobre o kernel `skills`: aderência via LLM (ADR-0004), export de
-  CV (PDF/DOCX) e CRM de candidaturas. Decisões pendentes: provider de LLM + env keys,
-  libs pure-Go de PDF/DOCX.
+- F3 — Vagas, CV e CRM sobre `skills`+`llm`: domínio `jobs` (aderência determinística via
+  skills + refino por LLM, joblink com SSRF ADR-0003), `cv` (CV mestre, adaptação,
+  export **PDF+DOCX** pure-Go) e CRM em `internal/applications`.
 
 ## [0.5.0] - 2026-06-08
 
