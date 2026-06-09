@@ -17,8 +17,12 @@
 	// shell (or redirect) before we know whether a session exists.
 	let ready = $state(false);
 
-	let isLogin = $derived($page.url.pathname === '/login');
+	let path = $derived($page.url.pathname);
+	let isAuthRoute = $derived(path === '/login' || path === '/signup');
 	let authed = $derived(session.authenticated);
+	// Where an anonymous visitor belongs: first-run setup before an owner exists,
+	// otherwise login.
+	let authDest = $derived(session.needsSetup ? '/signup' : '/login');
 
 	onMount(async () => {
 		// Populate the session if a valid cookie already exists (ignore 401).
@@ -30,17 +34,24 @@
 				session.csrf = me.csrf_token;
 			}
 		} catch (e) {
-			/* not logged in */
+			// Not logged in — find out whether the instance still needs its owner.
+			try {
+				const st = await api('/api/auth/status');
+				session.needsSetup = !!st.needs_setup;
+			} catch (e2) {
+				/* default to login */
+			}
 		} finally {
 			ready = true;
 		}
 	});
 
-	// Auth guard: logged out → /login; logged in but sitting on /login → app.
+	// Auth guard: send anonymous visitors to the right auth route (signup before
+	// an owner exists, else login); send logged-in users off the auth routes.
 	$effect(() => {
 		if (!ready) return;
-		if (!authed && !isLogin) goto('/login');
-		else if (authed && isLogin) goto('/projetos');
+		if (!authed && path !== authDest) goto(authDest);
+		else if (authed && isAuthRoute) goto('/projetos');
 	});
 
 	// Monitor stream follows auth: connect on login, drop on logout. Reactive so
@@ -57,7 +68,7 @@
 
 {#if !ready}
 	<div class="boot" aria-hidden="true"></div>
-{:else if isLogin}
+{:else if isAuthRoute}
 	<div class="auth-shell">
 		{@render children()}
 	</div>

@@ -69,6 +69,9 @@ func run() error {
 	if err := authSvc.Bootstrap(ctx, cfg.OwnerEmail, cfg.OwnerPassword, cfg.OwnerHash); err != nil {
 		return err
 	}
+	if needs, err := authSvc.NeedsSetup(ctx); err == nil && needs {
+		log.Info("no owner configured — the instance will be claimed via first-run signup")
+	}
 
 	authH := httpserver.NewAuthHandlers(authSvc, httpserver.AuthConfig{
 		CookieName:    cfg.SessionCookie,
