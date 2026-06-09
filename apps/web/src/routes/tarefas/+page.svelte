@@ -305,7 +305,7 @@
 		align-items: start;
 	}
 	.column {
-		background-color: var(--vapor);
+		background-color: var(--color-surface-sunken);
 		border: var(--border-width-1) solid var(--color-border);
 		border-radius: var(--radius-lg);
 		padding: var(--space-3);
