@@ -9,6 +9,16 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 
 ## [Não lançado]
 
+### A fazer
+- F4 — Monitor avançado (rollups/pruning de `check_results`, multi-instância) e F5
+  (polish, observabilidade, RBAC).
+
+## [0.6.0] - 2026-06-09
+
+F3 — Vagas, CV & CRM: busca de carreira fim-a-fim com IA (Groq), sobre o kernel
+`skills`. Importar/colar vagas e CV, % de aderência, adaptação por vaga, export
+PDF/DOCX e pipeline de candidaturas.
+
 ### Adicionado
 - **Kernel `internal/skills`** (fundação da F3): vocabulário canônico de skills com
   sinônimos/ontologia de categorias em dados Go in-code (sem banco, sem HTTP, sem
@@ -51,6 +61,12 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   o LLM gera um **resumo adaptado** para aquela vaga + uma **análise** (pontos fortes,
   lacunas, dica). Botão "🎯 Adaptar CV" em cada vaga. cv não importa jobs (a vaga chega
   por input — ADR-0001).
+- **CRM de candidaturas (`internal/applications`):** novo domínio + REST `/api/applications`
+  (migração `0013`); pipeline de status (interesse → aplicado → entrevista → oferta →
+  aceito/rejeitado), follow-up (próxima ação + data) e notas. Referencia a vaga por
+  `job_id` (soft-link, com snapshot de título/empresa — sem importar `jobs`). UI
+  **`/candidaturas`** (pipeline, mudar status inline, editar) + botão **"Acompanhar"** em
+  cada vaga.
 
 ### Alterado
 - **Monitor agora é centrado no projeto:** a aba Monitor saiu da sidebar; o status ao
@@ -67,10 +83,6 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   completo da vaga (prompt ajustado + limites de entrada/saída maiores).
 - **CV:** editar a profissão pelo header de Vagas não apaga mais as skills mestre
   (`PUT /api/profile` virou update parcial — `skills` opcional).
-
-### A fazer
-- F3 — CRM de candidaturas em `internal/applications` (pipeline + follow-ups,
-  referenciando as vagas). Última peça da F3.
 
 ## [0.5.0] - 2026-06-08
 
@@ -184,7 +196,8 @@ estrutura e artefatos de fundação.
   assinatura **Glow** (`#5EEAD4`) dos elementos "ao vivo" (`--color-live*`).
 - `README.md` (esqueleto) e este `CHANGELOG.md`.
 
-[Não lançado]: https://example.com/mirante/compare/v0.5.0...HEAD
+[Não lançado]: https://example.com/mirante/compare/v0.6.0...HEAD
+[0.6.0]: https://example.com/mirante/compare/v0.5.0...v0.6.0
 [0.5.0]: https://example.com/mirante/compare/v0.4.0...v0.5.0
 [0.4.0]: https://example.com/mirante/compare/v0.3.0...v0.4.0
 [0.3.0]: https://example.com/mirante/compare/v0.2.0...v0.3.0
