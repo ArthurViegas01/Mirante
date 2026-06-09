@@ -20,6 +20,20 @@ func RegisterRoutes(mux *http.ServeMux, protect func(http.Handler) http.Handler,
 	mux.Handle("PUT /api/profile", protect(http.HandlerFunc(h.save)))
 	mux.Handle("PUT /api/cv", protect(http.HandlerFunc(h.saveCV)))
 	mux.Handle("POST /api/cv/import", protect(http.HandlerFunc(h.importCV)))
+	mux.Handle("GET /api/cv/export", protect(http.HandlerFunc(h.export)))
+}
+
+func (h *handlers) export(w http.ResponseWriter, r *http.Request) {
+	data, contentType, filename, err := h.svc.Export(r.Context(), r.URL.Query().Get("format"))
+	if err != nil {
+		respond.Error(w, http.StatusInternalServerError, "internal", "falha ao gerar o documento")
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
 }
 
 func (h *handlers) importCV(w http.ResponseWriter, r *http.Request) {

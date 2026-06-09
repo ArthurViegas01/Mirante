@@ -13,6 +13,7 @@ type Profile struct {
 	Nome        string       `json:"nome"`
 	Titulo      string       `json:"titulo"`      // current headline / profession
 	TituloAlvo  string       `json:"titulo_alvo"` // role being aimed for
+	Contato     string       `json:"contato"`     // email · phone · location · links
 	Resumo      string       `json:"resumo"`
 	Skills      []string     `json:"skills"` // master skills (canonical when recognized)
 	Experiences []Experience `json:"experiences"`
