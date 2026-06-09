@@ -20,6 +20,14 @@ linters:
         #       (production = Secure; local dev runs over plain http).
         - G115
         - G124
+    misspell:
+      # Domain vocabulary and comments are Portuguese; these are correct pt-BR,
+      # not misspellings of their English look-alikes (annual / protocols).
+      ignore-rules:
+        - anual
+        - protocolos
+        - comandos
+        - profissional
     revive:
       rules:
         - name: exported

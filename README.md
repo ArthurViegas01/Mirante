@@ -5,8 +5,8 @@
 >
 > _by Lumni_ — o irmão "solo" do Lumni Console.
 
-**Status:** `v0.1.0` — planejamento. Nenhuma feature implementada ainda
-(ver [CHANGELOG.md](CHANGELOG.md)).
+**Status:** `v0.6.0` — F0–F3 entregues: Projetos, Monitor (no projeto), Tarefas,
+Stacks & Custos, e Vagas/CV/CRM com IA (Groq). Ver [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

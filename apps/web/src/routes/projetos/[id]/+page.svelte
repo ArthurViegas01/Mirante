@@ -5,15 +5,21 @@
 	import Input from '$lib/components/Input.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import ProjectStacks from '$lib/components/ProjectStacks.svelte';
+	import ProjectCosts from '$lib/components/ProjectCosts.svelte';
 	import { api } from '$lib/api.js';
 	import { STATUS, STATUS_OPTIONS, LINK_KINDS } from '$lib/projectStatus.js';
+	import { STATUS as TASK_STATUS, isOverdue, prazoLabel } from '$lib/taskMeta.js';
 
 	let id = $derived($page.params.id);
 
 	let project = $state(null);
+	let tasks = $state([]);
 	let loading = $state(true);
 	let error = $state('');
 	let status = $state('');
+
+	let openTasks = $derived(tasks.filter((t) => t.status !== 'feito'));
 
 	let linkLabel = $state('');
 	let linkUrl = $state('');
@@ -24,8 +30,13 @@
 		loading = true;
 		error = '';
 		try {
-			project = await api(`/api/projects/${pid}`);
+			const [p, tr] = await Promise.all([
+				api(`/api/projects/${pid}`),
+				api(`/api/tasks?project=${pid}`)
+			]);
+			project = p;
 			status = project.status;
+			tasks = tr.tasks;
 		} catch (e) {
 			error = e.message;
 		} finally {
@@ -68,7 +79,12 @@
 	}
 
 	async function remove() {
-		if (!confirm('Excluir este projeto? Os serviços do monitor vão junto.')) return;
+		if (
+			!confirm(
+				'Excluir este projeto? Os serviços do monitor vão junto; as tarefas são desvinculadas (não apagadas).'
+			)
+		)
+			return;
 		await api(`/api/projects/${id}`, { method: 'DELETE' });
 		goto('/projetos');
 	}
@@ -135,6 +151,37 @@
 			<div class="link-submit"><Button type="submit" size="sm">Adicionar</Button></div>
 		</form>
 		{#if linkError}<p class="error">{linkError}</p>{/if}
+	</section>
+
+	<ProjectStacks {id} />
+
+	<ProjectCosts {id} />
+
+	<section class="panel">
+		<div class="panel-head">
+			<h2>Tarefas abertas</h2>
+			<a class="board-link" href={`/tarefas?project=${id}`}>Ver no quadro →</a>
+		</div>
+		{#if openTasks.length}
+			<ul class="tasks">
+				{#each openTasks as t (t.id)}
+					<li>
+						<StatusBadge
+							status={TASK_STATUS[t.status]?.variant ?? 'info'}
+							label={TASK_STATUS[t.status]?.label ?? t.status}
+						/>
+						<span class="task-title">{t.titulo}</span>
+						{#if t.prazo}
+							<span class="task-prazo" class:late={isOverdue(t.prazo, t.status)}>{prazoLabel(t.prazo)}</span>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<p class="muted">
+				Nenhuma tarefa aberta. <a class="board-link" href={`/tarefas?project=${id}`}>Criar no quadro →</a>
+			</p>
+		{/if}
 	</section>
 
 	<section class="danger-zone">
@@ -276,6 +323,50 @@
 	}
 	.danger-zone {
 		margin-top: var(--space-8);
+	}
+	.panel-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-4);
+		margin-bottom: var(--space-4);
+	}
+	.panel-head h2 {
+		margin: 0;
+	}
+	.board-link {
+		font-size: var(--text-sm);
+		color: var(--color-link);
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	.tasks {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+	.tasks li {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		font-size: var(--text-sm);
+	}
+	.task-title {
+		color: var(--color-text);
+	}
+	.task-prazo {
+		margin-left: auto;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--color-text-muted);
+		white-space: nowrap;
+	}
+	.task-prazo.late {
+		color: var(--color-danger-text);
+		font-weight: var(--weight-semibold);
 	}
 	@media (max-width: 640px) {
 		.link-form {

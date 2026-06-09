@@ -10,7 +10,120 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### A fazer
-- F2 — Tarefas (vínculo a projeto e, depois, a vagas).
+- F4 — Monitor avançado (rollups/pruning de `check_results`, multi-instância) e F5
+  (polish, observabilidade, RBAC).
+
+## [0.6.0] - 2026-06-09
+
+F3 — Vagas, CV & CRM: busca de carreira fim-a-fim com IA (Groq), sobre o kernel
+`skills`. Importar/colar vagas e CV, % de aderência, adaptação por vaga, export
+PDF/DOCX e pipeline de candidaturas.
+
+### Adicionado
+- **Kernel `internal/skills`** (fundação da F3): vocabulário canônico de skills com
+  sinônimos/ontologia de categorias em dados Go in-code (sem banco, sem HTTP, sem
+  dependências). API determinística — `Normalize(raw)` resolve um token para a skill
+  canônica e `Match(texto)` extrai as skills mencionadas em texto livre (boundary-aware,
+  trata `C#`/`C++`/`.NET`/multi-palavra). É o piso do cálculo de aderência (jobs/cv).
+- **Gateway LLM `internal/llm`** (ADR-0004): provider único por env (default **Groq**,
+  OpenAI-compatible), sem failover. `Client` aplica rate-limit por rota e grava todo
+  uso num ledger (`llm_usage`, migração `0007`); `CompleteJSON` pede saída JSON e valida
+  por unmarshal no tipo do chamador. Provider `mock` para dev sem key (a API sobe e as
+  features de LLM degradam). Keys: `LLM_API_KEY`/`GROQ_API_KEY` etc.
+- **Domínio `jobs` (Vagas):** CRUD de vagas com REST em `/api/jobs` e migração `0008`
+  (`jobs` + `job_skills`). As skills exigidas são **extraídas deterministicamente** da
+  descrição via `skills.Match`; `POST /api/jobs/{id}/enrich` usa o LLM para preencher
+  empresa/senioridade/modelo/resumo. UI em `/vagas` (lista, cadastro colando a descrição,
+  botão "Enriquecer com IA"). O compose repassa `GROQ_API_KEY` (de um `.env` na raiz).
+- **Import de vaga por link:** `POST /api/jobs/import` busca a URL (fetch SSRF-guard,
+  ADR-0003, UA de browser) e extrai os campos do JSON-LD `JobPosting` que LinkedIn e
+  boards embutem (com fallback por LLM quando ausente). Na UI de `/vagas`, colar o link
+  preenche o formulário automaticamente (título, empresa, local, descrição, modelo).
+- **Perfil (domínio `cv`) + profissão no header de Vagas:** novo domínio `cv` com o
+  perfil mestre singleton em `/api/profile` (migração `0009`, upsert). O header de
+  `/vagas` mostra a **profissão atual e a almejada** (editável inline) — fundação do
+  CV mestre que cresce na sequência (experiências, adaptação por vaga, export PDF/DOCX).
+- **CV: skills mestre + aderência vaga↔CV:** o domínio `cv` ganhou as **skills mestre**
+  do dono (`/api/profile`, migração `0010`, canonicalizadas via skills kernel) e a
+  página **`/cv`** para gerenciá-las. Em `/vagas`, cada vaga mostra o **% de aderência**
+  (overlap das skills exigidas com as suas) e destaca as que você tem (verde) vs as
+  faltantes — base determinística do match (refino por LLM virá com as experiências).
+- **CV mestre: experiências e educação** geríveis na página `/cv` (listas com add/remover),
+  persistidas via `PUT /api/cv` (migração `0011`, replace atômico, ids no servidor).
+- **Import de CV por texto:** `POST /api/cv/import` usa o LLM para estruturar um CV (ou
+  inventário de skills) colado em {identidade, resumo, skills, experiências, educação};
+  a `/cv` preenche o formulário p/ revisão. Validado ao vivo com um CV real (Groq).
+- **Export do CV em PDF e DOCX:** `GET /api/cv/export?format=pdf|docx` renderiza o CV
+  mestre (PDF via `go-pdf/fpdf` pure-Go; **DOCX via OOXML escrito à mão** com
+  `archive/zip`, sem dependência nova). Botões na `/cv` salvam e baixam. Inclui o novo
+  campo **contato** (migração `0012`), preenchido também pelo import.
+- **Adaptação do CV por vaga (LLM):** `POST /api/cv/adapt` — dado o CV mestre + uma vaga,
+  o LLM gera um **resumo adaptado** para aquela vaga + uma **análise** (pontos fortes,
+  lacunas, dica). Botão "🎯 Adaptar CV" em cada vaga. cv não importa jobs (a vaga chega
+  por input — ADR-0001).
+- **CRM de candidaturas (`internal/applications`):** novo domínio + REST `/api/applications`
+  (migração `0013`); pipeline de status (interesse → aplicado → entrevista → oferta →
+  aceito/rejeitado), follow-up (próxima ação + data) e notas. Referencia a vaga por
+  `job_id` (soft-link, com snapshot de título/empresa — sem importar `jobs`). UI
+  **`/candidaturas`** (pipeline, mudar status inline, editar) + botão **"Acompanhar"** em
+  cada vaga.
+
+### Alterado
+- **Monitor agora é centrado no projeto:** a aba Monitor saiu da sidebar; o status ao
+  vivo de cada serviço (front/back/banco) aparece na seção **Stacks** ao abrir um
+  projeto, agora com **sparkline de latência, uptime (24h/7d/30d) e pausar/excluir**
+  inline (cards expansíveis). Alertas seguem na central de notificações (sino). As
+  rotas `/monitor` foram removidas; os endpoints `/api/services*` permanecem.
+
+### Corrigido
+- **Dark mode:** header de tabela (Projetos), colunas do kanban (Tarefas) e hover de
+  botões usavam cores sempre-claras; agora usam o role token `--color-surface-sunken`
+  e respeitam o tema.
+- **Import de vaga por link:** a descrição vinha resumida; agora devolve o texto
+  completo da vaga (prompt ajustado + limites de entrada/saída maiores).
+- **CV:** editar a profissão pelo header de Vagas não apaga mais as skills mestre
+  (`PUT /api/profile` virou update parcial — `skills` opcional).
+
+## [0.5.0] - 2026-06-08
+
+Projetos: Stacks & Custos — o status ao vivo de cada peça do projeto e o custo das
+assinaturas, sem sair do projeto. Extensão de Projetos/Monitor (ver ADR-0005).
+
+### Adicionado
+- **Stacks:** serviços do Monitor ganham `provider` (texto livre) e `camada`
+  (frontend/backend/database/outro) via migração `0005`. A project view tem uma
+  seção **Stacks** que agrupa os serviços do projeto por camada e mostra o status ao
+  vivo (SSE), com formulário compacto para adicionar serviço; os forms do Monitor
+  passam a aceitar provedor/camada. Status = checagem dos próprios endpoints
+  (status-de-provedor fica para depois).
+- **Custos:** novo domínio `subscriptions` (migração `0006`) — custo recorrente por
+  projeto, opcionalmente ligado a um serviço (`service_id`, soft-link sem FK), em
+  **BRL/USD sem conversão**, ciclo mensal/anual. REST em `/api/subscriptions`
+  (filtro `?project=`). A project view tem a seção **Custos** (total mensalizado por
+  moeda, add/editar/remover) e há a página global **`/custos`** agrupando as
+  assinaturas por projeto, com totais gerais.
+
+## [0.4.0] - 2026-06-08
+
+F2 — Tarefas: trabalho em quadro kanban, vinculável a projetos.
+
+### Adicionado
+- **Tarefas:** domínio completo (CRUD; status kanban `a_fazer`/`fazendo`/`feito`,
+  prioridade, prazo, tags) com REST em `/api/tasks` (filtros `?status=` e
+  `?project=`) e migração `0004` (`tasks` + `task_tags`; `project_id` FK→projects
+  `ON DELETE SET NULL`; `job_id` reservado, FK só na F3). Anatomia espelha
+  `projects`.
+- **UI de Tarefas:** quadro kanban (3 colunas, mover entre colunas), formulário com
+  prioridade/prazo/projeto/tags, destaque de prazo vencido e filtro por projeto.
+- **Project view:** seção "Tarefas abertas" com link para o quadro filtrado; a cópia
+  do excluir esclarece que as tarefas são desvinculadas (não apagadas).
+
+### Corrigido
+- **Guard de auth no SPA:** deslogado vai para `/login` num shell isolado (sem
+  sidebar); logado sai de `/login`; o stream SSE do monitor conecta e desconecta
+  reativamente conforme a sessão.
+- **`api.js`:** corpo não-JSON (página de erro HTML, resposta de proxy) vira uma
+  mensagem limpa em vez de estourar `JSON.parse`.
 
 ## [0.3.0] - 2026-06-08
 
@@ -83,7 +196,10 @@ estrutura e artefatos de fundação.
   assinatura **Glow** (`#5EEAD4`) dos elementos "ao vivo" (`--color-live*`).
 - `README.md` (esqueleto) e este `CHANGELOG.md`.
 
-[Não lançado]: https://example.com/mirante/compare/v0.3.0...HEAD
+[Não lançado]: https://example.com/mirante/compare/v0.6.0...HEAD
+[0.6.0]: https://example.com/mirante/compare/v0.5.0...v0.6.0
+[0.5.0]: https://example.com/mirante/compare/v0.4.0...v0.5.0
+[0.4.0]: https://example.com/mirante/compare/v0.3.0...v0.4.0
 [0.3.0]: https://example.com/mirante/compare/v0.2.0...v0.3.0
 [0.2.0]: https://example.com/mirante/compare/v0.1.0...v0.2.0
 [0.1.0]: https://example.com/mirante/releases/tag/v0.1.0

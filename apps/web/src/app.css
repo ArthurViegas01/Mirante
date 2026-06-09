@@ -111,6 +111,7 @@
   --color-bg:               var(--mist);
   --color-surface:          var(--frost);
   --color-surface-elevated: var(--frost);
+  --color-surface-sunken:   var(--vapor);
   --color-border:           var(--ink-200);
   --color-border-strong:    var(--ink-300);
   --color-divider:          var(--ink-100);
@@ -238,6 +239,7 @@
   --color-bg:               var(--ink-950);
   --color-surface:          var(--ink-900);
   --color-surface-elevated: var(--ink-800);
+  --color-surface-sunken:   #0D1825; /* between ink-950/900: recessed panels, subtle hovers */
   --color-border:           rgba(255,255,255,0.08);
   --color-border-strong:    var(--ink-700);
   --color-divider:          rgba(255,255,255,0.05);

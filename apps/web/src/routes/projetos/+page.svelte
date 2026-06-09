@@ -205,7 +205,7 @@
 	}
 	th {
 		text-align: left;
-		background-color: var(--vapor);
+		background-color: var(--color-surface-sunken);
 		font-family: var(--font-mono);
 		font-size: 11px;
 		letter-spacing: 0.08em;
@@ -226,7 +226,7 @@
 		transition: background-color var(--dur-fast) var(--ease-out);
 	}
 	tbody tr:hover {
-		background-color: var(--vapor);
+		background-color: var(--color-surface-sunken);
 	}
 	tbody tr:last-child td {
 		border-bottom: none;

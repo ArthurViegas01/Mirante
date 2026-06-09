@@ -16,20 +16,21 @@ func NewSQLiteRepo(d *idb.DB) Repository { return &sqliteRepo{db: d} }
 
 type rowScanner interface{ Scan(dest ...any) error }
 
-const serviceCols = `id, project_id, nome, kind, target, expected_status,
+const serviceCols = `id, project_id, nome, provider, camada, kind, target, expected_status,
 	degraded_threshold_ms, timeout_ms, interval_seconds, anti_flap_n, recovery_k,
 	enabled, current_status, consecutive_failures, consecutive_successes,
 	last_checked_at, created_at, updated_at`
 
 func scanService(s rowScanner) (*Service, error) {
 	var (
-		svc                                                           Service
-		idStr, projectID, nome, kind, target, expectedStatus, current string
-		enabled                                                       int
-		lastChecked                                                   sql.NullString
-		createdAt, updatedAt                                          string
+		svc                                  Service
+		idStr, projectID, nome, kind, target string
+		expectedStatus, current              string
+		provider, camada, lastChecked        sql.NullString
+		enabled                              int
+		createdAt, updatedAt                 string
 	)
-	if err := s.Scan(&idStr, &projectID, &nome, &kind, &target, &expectedStatus,
+	if err := s.Scan(&idStr, &projectID, &nome, &provider, &camada, &kind, &target, &expectedStatus,
 		&svc.DegradedThresholdMs, &svc.TimeoutMs, &svc.IntervalSeconds, &svc.AntiFlapN, &svc.RecoveryK,
 		&enabled, &current, &svc.ConsecutiveFailures, &svc.ConsecutiveSuccesses,
 		&lastChecked, &createdAt, &updatedAt); err != nil {
@@ -41,6 +42,8 @@ func scanService(s rowScanner) (*Service, error) {
 	svc.ID = ServiceID(idStr)
 	svc.ProjectID = projectID
 	svc.Nome = nome
+	svc.Provider = provider.String
+	svc.Camada = camada.String
 	svc.Kind = Kind(kind)
 	svc.Target = target
 	svc.ExpectedStatus = expectedStatus
@@ -57,10 +60,10 @@ func scanService(s rowScanner) (*Service, error) {
 
 func (r *sqliteRepo) CreateService(ctx context.Context, s *Service) error {
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO services (id, project_id, nome, kind, target, expected_status,
+		`INSERT INTO services (id, project_id, nome, provider, camada, kind, target, expected_status,
 			degraded_threshold_ms, timeout_ms, interval_seconds, anti_flap_n, recovery_k, enabled)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		string(s.ID), s.ProjectID, s.Nome, string(s.Kind), s.Target, s.ExpectedStatus,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		string(s.ID), s.ProjectID, s.Nome, nullableStr(s.Provider), nullableStr(s.Camada), string(s.Kind), s.Target, s.ExpectedStatus,
 		s.DegradedThresholdMs, s.TimeoutMs, s.IntervalSeconds, s.AntiFlapN, s.RecoveryK, boolToInt(s.Enabled))
 	return err
 }
@@ -110,11 +113,11 @@ func (r *sqliteRepo) CountServicesByProject(ctx context.Context, projectID strin
 
 func (r *sqliteRepo) UpdateServiceConfig(ctx context.Context, s *Service) error {
 	res, err := r.db.ExecContext(ctx,
-		`UPDATE services SET nome = ?, kind = ?, target = ?, expected_status = ?,
+		`UPDATE services SET nome = ?, provider = ?, camada = ?, kind = ?, target = ?, expected_status = ?,
 			degraded_threshold_ms = ?, timeout_ms = ?, interval_seconds = ?,
 			anti_flap_n = ?, recovery_k = ?, enabled = ?, updated_at = ?
 		 WHERE id = ?`,
-		s.Nome, string(s.Kind), s.Target, s.ExpectedStatus,
+		s.Nome, nullableStr(s.Provider), nullableStr(s.Camada), string(s.Kind), s.Target, s.ExpectedStatus,
 		s.DegradedThresholdMs, s.TimeoutMs, s.IntervalSeconds, s.AntiFlapN, s.RecoveryK,
 		boolToInt(s.Enabled), idb.FormatTime(time.Now()), string(s.ID))
 	if err != nil {

@@ -11,17 +11,24 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lumni/mirante/internal/applications"
+	"github.com/lumni/mirante/internal/cv"
+	"github.com/lumni/mirante/internal/jobs"
+	"github.com/lumni/mirante/internal/llm"
 	"github.com/lumni/mirante/internal/monitor"
 	"github.com/lumni/mirante/internal/platform/auth"
 	"github.com/lumni/mirante/internal/platform/config"
 	"github.com/lumni/mirante/internal/platform/db"
 	"github.com/lumni/mirante/internal/platform/httpserver"
+	"github.com/lumni/mirante/internal/platform/httpx"
 	"github.com/lumni/mirante/internal/platform/logging"
 	"github.com/lumni/mirante/internal/platform/migrate"
 	"github.com/lumni/mirante/internal/platform/otel"
 	"github.com/lumni/mirante/internal/platform/ratelimit"
 	"github.com/lumni/mirante/internal/platform/sse"
 	"github.com/lumni/mirante/internal/projects"
+	"github.com/lumni/mirante/internal/subscriptions"
+	"github.com/lumni/mirante/internal/tasks"
 )
 
 func main() {
@@ -75,6 +82,38 @@ func run() error {
 
 	projectsSvc := projects.NewService(projects.NewSQLiteRepo(database))
 	projects.RegisterRoutes(mux, authH.Protect, projectsSvc)
+
+	tasksSvc := tasks.NewService(tasks.NewSQLiteRepo(database))
+	tasks.RegisterRoutes(mux, authH.Protect, tasksSvc)
+
+	subsSvc := subscriptions.NewService(subscriptions.NewSQLiteRepo(database))
+	subscriptions.RegisterRoutes(mux, authH.Protect, subsSvc)
+
+	// LLM gateway (ADR-0004). Absent key → unavailable client; features degrade.
+	var llmClient *llm.Client
+	if provider, ok := llm.NewProvider(cfg.LLMProvider, cfg.LLMModel, cfg.LLMAPIKey); ok {
+		llmClient = llm.NewClient(provider, llm.NewSQLiteLedger(database), llm.NewRouteLimiter(cfg.LLMRatePerMinute))
+		log.Info("llm enabled", "provider", provider.Name(), "model", provider.Model())
+	} else {
+		llmClient = llm.NewClient(nil, nil, nil)
+		log.Info("llm disabled (no API key)")
+	}
+
+	// Job-link import uses the SSRF-guarded JobLink policy (ADR-0003): private IPs
+	// blocked, with a browser-like UA to read public postings (e.g. LinkedIn).
+	jobLinkFetcher := httpx.NewFetcher(httpx.Policy{
+		AllowPrivateIPs: false,
+		MaxBodyBytes:    1 << 20,
+		UserAgent:       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+	})
+	jobsSvc := jobs.NewService(jobs.NewSQLiteRepo(database), llmClient, jobLinkFetcher)
+	jobs.RegisterRoutes(mux, authH.Protect, jobsSvc)
+
+	cvSvc := cv.NewService(cv.NewSQLiteRepo(database), llmClient)
+	cv.RegisterRoutes(mux, authH.Protect, cvSvc)
+
+	applicationsSvc := applications.NewService(applications.NewSQLiteRepo(database))
+	applications.RegisterRoutes(mux, authH.Protect, applicationsSvc)
 
 	monitorRepo := monitor.NewSQLiteRepo(database)
 	monitorMgr := monitor.NewManager(monitorRepo)

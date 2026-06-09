@@ -24,7 +24,17 @@ export async function api(path, { method = 'GET', body } = {}) {
 	});
 
 	const text = await res.text();
-	const data = text ? JSON.parse(text) : null;
+	let data = null;
+	if (text) {
+		try {
+			data = JSON.parse(text);
+		} catch {
+			// Body wasn't JSON (an HTML error page, a proxy response, etc.). On an
+			// error status, surface a clean message instead of a parse exception.
+			if (!res.ok) throw new Error(res.statusText || 'request failed');
+			data = text;
+		}
+	}
 
 	if (!res.ok) {
 		const message = data?.error?.message || res.statusText || 'request failed';

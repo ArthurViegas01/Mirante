@@ -19,6 +19,7 @@ import (
 type Policy struct {
 	AllowPrivateIPs bool
 	MaxBodyBytes    int64
+	UserAgent       string
 }
 
 // Errors.
@@ -38,6 +39,9 @@ func NewFetcher(p Policy) *Fetcher {
 	if p.MaxBodyBytes <= 0 {
 		p.MaxBodyBytes = 64 << 10
 	}
+	if p.UserAgent == "" {
+		p.UserAgent = "Mirante-Monitor/1.0"
+	}
 	return &Fetcher{
 		policy: p,
 		client: &http.Client{
@@ -53,41 +57,62 @@ type Result struct {
 	ResolvedIP string
 }
 
-// Get performs one GET. The context carries the timeout. The response body is
-// drained up to MaxBodyBytes and discarded.
+// Get performs one GET, draining and discarding the body (used by the monitor,
+// which only cares about reachability/latency).
 func (f *Fetcher) Get(ctx context.Context, rawURL string) (*Result, error) {
+	res, _, err := f.do(ctx, rawURL, false)
+	return res, err
+}
+
+// Fetch performs one GET and returns the response body (up to MaxBodyBytes). Used
+// by job-link import to read a posting's HTML.
+func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Result, []byte, error) {
+	return f.do(ctx, rawURL, true)
+}
+
+func (f *Fetcher) do(ctx context.Context, rawURL string, keepBody bool) (*Result, []byte, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, fmt.Errorf("parse url: %w", err)
+		return nil, nil, fmt.Errorf("parse url: %w", err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, ErrBadScheme
+		return nil, nil, ErrBadScheme
 	}
 
 	ip, err := f.resolveAndCheck(ctx, u.Hostname())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	req.Header.Set("User-Agent", "Mirante-Monitor/1.0")
+	req.Header.Set("User-Agent", f.policy.UserAgent)
 
 	start := time.Now()
 	resp, err := f.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, f.policy.MaxBodyBytes))
 
-	return &Result{
+	res := &Result{
 		StatusCode: resp.StatusCode,
 		LatencyMs:  int(time.Since(start).Milliseconds()),
 		ResolvedIP: ip,
-	}, nil
+	}
+
+	limited := io.LimitReader(resp.Body, f.policy.MaxBodyBytes)
+	if keepBody {
+		body, err := io.ReadAll(limited)
+		if err != nil {
+			return nil, nil, err
+		}
+		return res, body, nil
+	}
+	_, _ = io.Copy(io.Discard, limited)
+	return res, nil, nil
 }
 
 func (f *Fetcher) resolveAndCheck(ctx context.Context, host string) (string, error) {

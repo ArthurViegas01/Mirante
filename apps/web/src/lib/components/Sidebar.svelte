@@ -8,16 +8,30 @@
 			label: 'Projetos',
 			icon: 'M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'
 		},
-		{ href: '/monitor', label: 'Monitor', icon: 'M3 12h4l3 8 4-16 3 8h4' },
 		{
 			href: '/tarefas',
 			label: 'Tarefas',
 			icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'
 		},
 		{
+			href: '/custos',
+			label: 'Custos',
+			icon: 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'
+		},
+		{
 			href: '/vagas',
 			label: 'Vagas',
 			icon: 'M3 7h18v13H3zM8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'
+		},
+		{
+			href: '/cv',
+			label: 'CV',
+			icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8'
+		},
+		{
+			href: '/candidaturas',
+			label: 'Candidaturas',
+			icon: 'M3 5h18l-7 8v5l-4 2v-7z'
 		}
 	];
 

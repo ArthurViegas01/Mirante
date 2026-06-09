@@ -28,6 +28,8 @@ type Config struct {
 	SecretKey string
 
 	LLMProvider      string
+	LLMModel         string
+	LLMAPIKey        string
 	LLMRatePerMinute int
 
 	OtelService  string
@@ -50,9 +52,24 @@ func Load() (Config, error) {
 		OwnerPassword: env("OWNER_PASSWORD", ""),
 		OwnerHash:     env("OWNER_PASSWORD_HASH", ""),
 		SecretKey:     env("APP_SECRET_KEY", ""),
-		LLMProvider:   env("LLM_PROVIDER", "anthropic"),
+		LLMProvider:   env("LLM_PROVIDER", "groq"),
+		LLMModel:      env("LLM_MODEL", ""),
 		OtelService:   env("OTEL_SERVICE_NAME", "mirante-api"),
 		OtelEndpoint:  env("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+	}
+
+	// The API key is read generically (LLM_API_KEY) or from the provider's
+	// conventional var. Absent in dev → LLM features fall back to a mock.
+	c.LLMAPIKey = env("LLM_API_KEY", "")
+	if c.LLMAPIKey == "" {
+		switch c.LLMProvider {
+		case "groq":
+			c.LLMAPIKey = env("GROQ_API_KEY", "")
+		case "anthropic":
+			c.LLMAPIKey = env("ANTHROPIC_API_KEY", "")
+		case "openai":
+			c.LLMAPIKey = env("OPENAI_API_KEY", "")
+		}
 	}
 
 	ttl, err := time.ParseDuration(env("SESSION_TTL", "720h"))
