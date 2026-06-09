@@ -9,6 +9,17 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 
 ## [Não lançado]
 
+### A fazer
+- Deploy real (Fly + Turso) e front hospedado; multi-usuário/RBAC quando houver
+  necessidade (ADR-0007). Multi-instância (Redis + leader election) segue adiada
+  (ADR-0002).
+
+## [0.7.0] - 2026-06-09
+
+F4 + F5 + prontidão de produção: rollups/pruning do Monitor, observabilidade OTLP,
+webhooks de alerta, signup do dono, banco hospedado (Turso/libSQL) e configuração
+de deploy (Fly.io).
+
 ### Adicionado
 - **Observabilidade: OTLP traces (F5, ADR-0007).** O `internal/platform/otel`
   deixou de ser no-op: com `OTEL_EXPORTER_OTLP_ENDPOINT` setada, a API exporta
@@ -46,10 +57,6 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   (24h/7d/30d) passa a somar rollups + brutos — disjuntos no tempo, **sem dupla
   contagem nem perda** de amostras; a sparkline continua lendo os brutos recentes.
   Multi-instância segue fora de escopo (ADR-0002: app single-instance).
-
-### A fazer
-- F5 — polish, observabilidade (OTel), RBAC, webhooks de alerta. Multi-instância
-  (Redis + leader election) permanece adiada (ADR-0002).
 
 ## [0.6.0] - 2026-06-09
 
@@ -234,7 +241,8 @@ estrutura e artefatos de fundação.
   assinatura **Glow** (`#5EEAD4`) dos elementos "ao vivo" (`--color-live*`).
 - `README.md` (esqueleto) e este `CHANGELOG.md`.
 
-[Não lançado]: https://example.com/mirante/compare/v0.6.0...HEAD
+[Não lançado]: https://example.com/mirante/compare/v0.7.0...HEAD
+[0.7.0]: https://example.com/mirante/compare/v0.6.0...v0.7.0
 [0.6.0]: https://example.com/mirante/compare/v0.5.0...v0.6.0
 [0.5.0]: https://example.com/mirante/compare/v0.4.0...v0.5.0
 [0.4.0]: https://example.com/mirante/compare/v0.3.0...v0.4.0

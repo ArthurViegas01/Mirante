@@ -5,8 +5,10 @@
 >
 > _by Lumni_ — o irmão "solo" do Lumni Console.
 
-**Status:** `v0.6.0` — F0–F3 entregues: Projetos, Monitor (no projeto), Tarefas,
-Stacks & Custos, e Vagas/CV/CRM com IA (Groq). Ver [CHANGELOG.md](CHANGELOG.md).
+**Status:** `v0.7.0` — F0–F5 entregues: Projetos, Monitor (no projeto, com rollups/
+pruning), Tarefas, Stacks & Custos, Vagas/CV/CRM com IA (Groq), webhooks de alerta e
+observabilidade OTLP — além de prontidão de produção (signup do dono, banco Turso,
+deploy Fly). Ver [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -123,6 +125,8 @@ make web-build    # build de produção do SvelteKit
 > é versionado.
 
 ## Deploy (Fly.io)
+
+Guia completo passo a passo em **[docs/DEPLOY.md](docs/DEPLOY.md)**. Resumo:
 
 A API tem um [`apps/api/fly.toml`](apps/api/fly.toml) pronto. **Uma única máquina**
 (`fly scale count 1`) — o hub SSE, o scheduler do Monitor e o compactor de rollups
