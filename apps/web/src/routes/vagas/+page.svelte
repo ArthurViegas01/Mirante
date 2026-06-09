@@ -35,6 +35,8 @@
 	let adaptingId = $state('');
 	let adaptId = $state('');
 	let adaptResult = $state(null);
+	let trackingId = $state('');
+	let trackedIds = $state(new Set());
 
 	async function load() {
 		loading = true;
@@ -129,6 +131,22 @@
 			error = e.message;
 		} finally {
 			adaptingId = '';
+		}
+	}
+
+	async function trackJob(job) {
+		trackingId = job.id;
+		error = '';
+		try {
+			await api('/api/applications', {
+				method: 'POST',
+				body: { job_id: job.id, titulo: job.titulo, empresa: job.empresa }
+			});
+			trackedIds = new Set([...trackedIds, job.id]);
+		} catch (e) {
+			error = e.message;
+		} finally {
+			trackingId = '';
 		}
 	}
 
@@ -243,6 +261,13 @@
 					<Button size="sm" variant="secondary" onclick={() => adaptCV(job)} disabled={adaptingId === job.id}>
 						{adaptingId === job.id ? 'Adaptando…' : '🎯 Adaptar CV'}
 					</Button>
+					{#if trackedIds.has(job.id)}
+						<a class="tracked" href="/candidaturas">✓ No pipeline</a>
+					{:else}
+						<Button size="sm" variant="secondary" onclick={() => trackJob(job)} disabled={trackingId === job.id}>
+							{trackingId === job.id ? '…' : 'Acompanhar'}
+						</Button>
+					{/if}
 					<button class="del" onclick={() => remove(job)}>Excluir</button>
 				</div>
 
@@ -471,6 +496,12 @@
 	}
 	.del:hover {
 		color: var(--color-danger-text);
+	}
+	.tracked {
+		font-size: var(--text-sm);
+		color: var(--color-success-text);
+		text-decoration: none;
+		align-self: center;
 	}
 	.adapt {
 		margin-top: var(--space-3);

@@ -27,6 +27,11 @@
 			href: '/cv',
 			label: 'CV',
 			icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8'
+		},
+		{
+			href: '/candidaturas',
+			label: 'Candidaturas',
+			icon: 'M3 5h18l-7 8v5l-4 2v-7z'
 		}
 	];
 
