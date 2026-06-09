@@ -20,6 +20,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrRateLimited        = errors.New("too many attempts")
 	ErrUnauthenticated    = errors.New("unauthenticated")
+	ErrSignupClosed       = errors.New("registration closed: owner already exists")
 )
 
 // Service ties the stores together with the login limiter.
@@ -40,7 +41,10 @@ func NewService(db *sql.DB, ttl time.Duration) *Service {
 	}
 }
 
-// Bootstrap seeds the single owner if no user exists yet. It is idempotent.
+// Bootstrap seeds the single owner from environment config if no user exists yet.
+// It is idempotent. With no OWNER_EMAIL it is a no-op: the owner is then claimed
+// through the first-run signup flow instead (see Signup). OWNER_EMAIL without a
+// password/hash is a real misconfiguration and still errors.
 func (s *Service) Bootstrap(ctx context.Context, email, password, passwordHash string) error {
 	n, err := s.users.Count(ctx)
 	if err != nil {
@@ -50,7 +54,7 @@ func (s *Service) Bootstrap(ctx context.Context, email, password, passwordHash s
 		return nil
 	}
 	if strings.TrimSpace(email) == "" {
-		return errors.New("OWNER_EMAIL is required to bootstrap the owner")
+		return nil
 	}
 	hash := passwordHash
 	if hash == "" {
@@ -63,6 +67,32 @@ func (s *Service) Bootstrap(ctx context.Context, email, password, passwordHash s
 		}
 	}
 	return s.users.Create(ctx, &User{ID: id.New(), Email: email, PasswordHash: hash})
+}
+
+// NeedsSetup reports whether the instance has no owner yet (so the UI should
+// route to the first-run signup instead of login).
+func (s *Service) NeedsSetup(ctx context.Context) (bool, error) {
+	n, err := s.users.Count(ctx)
+	return n == 0, err
+}
+
+// Signup claims the instance: it creates the single owner (only if none exists
+// yet) and immediately opens a session, returning it plus the cookie token. A
+// second attempt once the owner exists returns ErrSignupClosed.
+func (s *Service) Signup(ctx context.Context, email, password, name, userAgent, ip string) (*Session, string, error) {
+	email = strings.TrimSpace(email)
+	if email == "" || password == "" {
+		return nil, "", ErrInvalidCredentials
+	}
+	hash, err := HashPassword(password)
+	if err != nil {
+		return nil, "", err
+	}
+	u := &User{ID: id.New(), Email: email, Name: strings.TrimSpace(name), PasswordHash: hash}
+	if err := s.users.CreateFirst(ctx, u); err != nil {
+		return nil, "", err
+	}
+	return s.createSession(ctx, u.ID, userAgent, ip)
 }
 
 // Login verifies credentials and creates a session, returning it plus the
@@ -87,6 +117,12 @@ func (s *Service) Login(ctx context.Context, email, password, userAgent, ip stri
 	}
 	s.limiter.Reset(key)
 
+	return s.createSession(ctx, u.ID, userAgent, ip)
+}
+
+// createSession mints a session (opaque token + CSRF token) for a user and
+// persists it, returning the session and the plaintext cookie token.
+func (s *Service) createSession(ctx context.Context, userID, userAgent, ip string) (*Session, string, error) {
 	token, err := newToken()
 	if err != nil {
 		return nil, "", err
@@ -95,15 +131,13 @@ func (s *Service) Login(ctx context.Context, email, password, userAgent, ip stri
 	if err != nil {
 		return nil, "", err
 	}
-
-	now := time.Now().UTC()
 	sess := &Session{
 		ID:        id.New(),
-		UserID:    u.ID,
+		UserID:    userID,
 		CSRFToken: csrf,
 		UserAgent: userAgent,
 		IP:        ip,
-		ExpiresAt: now.Add(s.ttl),
+		ExpiresAt: time.Now().UTC().Add(s.ttl),
 	}
 	if err := s.sessions.Create(ctx, sess, hashToken(token)); err != nil {
 		return nil, "", err

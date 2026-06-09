@@ -99,6 +99,11 @@ docker compose up --build       # sobe libSQL (sqld) + API + web (dev)
 # login de dev: owner@example.com / change-me-dev  (definido no compose)
 ```
 
+Em produção (sem `OWNER_EMAIL` no ambiente) a instância sobe **sem dono** e o
+**primeiro acesso pela UI** cria a conta do dono (signup, single-user; depois o
+cadastro fecha). Para experimentar o signup localmente, comente `OWNER_EMAIL`/
+`OWNER_PASSWORD` no `docker-compose.yml` e zere o volume (`docker compose down -v`).
+
 Sem Docker para o frontend:
 
 ```bash

@@ -33,6 +33,8 @@ func NewAuthHandlers(svc *auth.Service, cfg AuthConfig) *AuthHandlers {
 
 // RegisterRoutes mounts the auth routes on the given mux.
 func (h *AuthHandlers) RegisterRoutes(mux *http.ServeMux) {
+	mux.Handle("GET /api/auth/status", http.HandlerFunc(h.Status))
+	mux.Handle("POST /api/auth/signup", http.HandlerFunc(h.Signup))
 	mux.Handle("POST /api/auth/login", http.HandlerFunc(h.Login))
 	mux.Handle("GET /api/auth/me", h.RequireAuth(http.HandlerFunc(h.Me)))
 	mux.Handle("POST /api/auth/logout", h.Protect(http.HandlerFunc(h.Logout)))
@@ -48,6 +50,58 @@ func (h *AuthHandlers) Protect(next http.Handler) http.Handler {
 type loginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=1"`
+}
+
+type signupRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8"`
+	Name     string `json:"name" validate:"omitempty,max=80"`
+}
+
+// Status reports whether the instance still needs its first-run owner setup. It
+// is public so the SPA can route an anonymous visitor to signup vs login.
+func (h *AuthHandlers) Status(w http.ResponseWriter, r *http.Request) {
+	needs, err := h.svc.NeedsSetup(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"needs_setup": needs})
+}
+
+// Signup claims the instance for the first (and only) owner, then logs them in.
+func (h *AuthHandlers) Signup(w http.ResponseWriter, r *http.Request) {
+	if !originAllowed(r, h.cfg.AllowedOrigin) {
+		writeError(w, http.StatusForbidden, "forbidden_origin", "origin not allowed")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxLoginBody)
+	var req signupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	if err := validate.Struct(req); err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error",
+			"a valid email and a password of at least 8 characters are required")
+		return
+	}
+
+	sess, token, err := h.svc.Signup(r.Context(), req.Email, req.Password, req.Name, r.UserAgent(), clientIP(r))
+	if err != nil {
+		switch {
+		case errors.Is(err, auth.ErrSignupClosed):
+			writeError(w, http.StatusForbidden, "signup_closed", "registration is closed")
+		case errors.Is(err, auth.ErrInvalidCredentials):
+			writeError(w, http.StatusBadRequest, "validation_error", "email and password are required")
+		default:
+			writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		}
+		return
+	}
+
+	http.SetCookie(w, h.sessionCookie(token, sess.ExpiresAt))
+	writeJSON(w, http.StatusCreated, map[string]any{"csrf_token": sess.CSRFToken})
 }
 
 // Login authenticates and starts a session.

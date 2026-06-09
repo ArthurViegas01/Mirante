@@ -27,7 +27,13 @@ const (
 	testOrigin = "http://localhost:5173"
 )
 
-func setup(t *testing.T) (string, *http.Client) {
+func setup(t *testing.T) (string, *http.Client) { return serve(t, true) }
+
+// setupNoOwner builds the server with no owner bootstrapped, so the first-run
+// signup flow is open.
+func setupNoOwner(t *testing.T) (string, *http.Client) { return serve(t, false) }
+
+func serve(t *testing.T, bootstrap bool) (string, *http.Client) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -37,7 +43,9 @@ func setup(t *testing.T) (string, *http.Client) {
 	require.NoError(t, migrate.Up(database.DB))
 
 	svc := auth.NewService(database.DB, time.Hour)
-	require.NoError(t, svc.Bootstrap(ctx, testEmail, testPass, ""))
+	if bootstrap {
+		require.NoError(t, svc.Bootstrap(ctx, testEmail, testPass, ""))
+	}
 
 	authH := NewAuthHandlers(svc, AuthConfig{
 		CookieName:    "mirante_session",
@@ -94,6 +102,39 @@ func doLogin(t *testing.T, client *http.Client, base, email, pass string) (int, 
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&b)
 	return resp.StatusCode, b.CSRFToken
+}
+
+func doSignup(t *testing.T, client *http.Client, base, email, pass, name string) (int, string) {
+	t.Helper()
+	body := fmt.Sprintf(`{"email":%q,"password":%q,"name":%q}`, email, pass, name)
+	resp, err := client.Do(newRequest(t, http.MethodPost, base+"/api/auth/signup", body, ""))
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	var b struct {
+		CSRFToken string `json:"csrf_token"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&b)
+	return resp.StatusCode, b.CSRFToken
+}
+
+func newClient(t *testing.T) *http.Client {
+	t.Helper()
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	return &http.Client{Jar: jar}
+}
+
+func needsSetup(t *testing.T, client *http.Client, base string) bool {
+	t.Helper()
+	resp, err := client.Do(newRequest(t, http.MethodGet, base+"/api/auth/status", "", ""))
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	var b struct {
+		NeedsSetup bool `json:"needs_setup"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&b))
+	return b.NeedsSetup
 }
 
 func statusOf(t *testing.T, client *http.Client, req *http.Request) int {
@@ -156,4 +197,44 @@ func TestLoginRejectsForeignOrigin(t *testing.T) {
 		fmt.Sprintf(`{"email":%q,"password":%q}`, testEmail, testPass), "")
 	req.Header.Set("Origin", "http://evil.example")
 	require.Equal(t, http.StatusForbidden, statusOf(t, client, req))
+}
+
+func TestSignupClaimsInstanceThenCloses(t *testing.T) {
+	base, client := setupNoOwner(t)
+
+	// Fresh instance needs setup, and a protected route is closed.
+	require.True(t, needsSetup(t, client, base))
+	require.Equal(t, http.StatusUnauthorized,
+		statusOf(t, client, newRequest(t, http.MethodGet, base+"/api/auth/me", "", "")))
+
+	// Signup claims the owner and logs in (cookie set, CSRF returned).
+	status, csrf := doSignup(t, client, base, testEmail, testPass, "Owner")
+	require.Equal(t, http.StatusCreated, status)
+	require.NotEmpty(t, csrf)
+	require.Equal(t, http.StatusOK,
+		statusOf(t, client, newRequest(t, http.MethodGet, base+"/api/auth/me", "", "")))
+
+	// Setup is now done and registration is closed for a new visitor.
+	require.False(t, needsSetup(t, client, base))
+	fresh := newClient(t)
+	closed, _ := doSignup(t, fresh, base, "intruder@example.com", "another-pass", "")
+	require.Equal(t, http.StatusForbidden, closed)
+
+	// The owner can log in with the credentials chosen at signup.
+	loginStatus, _ := doLogin(t, fresh, base, testEmail, testPass)
+	require.Equal(t, http.StatusOK, loginStatus)
+}
+
+func TestSignupRejectsShortPassword(t *testing.T) {
+	base, client := setupNoOwner(t)
+	status, _ := doSignup(t, client, base, testEmail, "short", "")
+	require.Equal(t, http.StatusBadRequest, status)
+	require.True(t, needsSetup(t, client, base)) // nothing was created
+}
+
+func TestSignupClosedWhenOwnerBootstrapped(t *testing.T) {
+	base, client := setup(t) // owner seeded from env-style bootstrap
+	require.False(t, needsSetup(t, client, base))
+	status, _ := doSignup(t, client, base, "someone@example.com", "a-valid-pass", "")
+	require.Equal(t, http.StatusForbidden, status)
 }

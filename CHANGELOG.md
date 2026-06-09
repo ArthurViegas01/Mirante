@@ -10,6 +10,16 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### Adicionado
+- **Signup do dono + banco hospedado (prontidão para deploy).** O acesso deixa de
+  exigir o owner por env: se `OWNER_EMAIL` não for fornecido, a instância sobe sem
+  dono e o **primeiro acesso pela própria UI** reivindica a conta do dono
+  (`POST /api/auth/signup`, single-user — o cadastro fecha depois com
+  `ErrSignupClosed`; criação atômica via `CreateFirst` numa transação). Novo
+  `GET /api/auth/status` (`{needs_setup}`) deixa o SPA rotear o visitante anônimo
+  para `/signup` (página nova) vs `/login`; o guard do layout foi generalizado. O
+  bootstrap por env vira atalho de dev (idempotente, opcional). O banco já fala
+  **libSQL/Turso** por scheme (`DATABASE_URL=libsql://…` + `DATABASE_AUTH_TOKEN`) —
+  habilitando um deploy hospedado sem owner-por-env.
 - **Monitor: rollups horários + pruning (F4, ADR-0006).** O histórico bruto de
   checks (`check_results`, ~1 linha/min por serviço) agora é compactado para não
   crescer sem limite. Um worker horário (na inicialização e a cada hora) agrega os
