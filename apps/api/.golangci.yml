@@ -26,6 +26,7 @@ linters:
       ignore-rules:
         - anual
         - protocolos
+        - comandos
     revive:
       rules:
         - name: exported
