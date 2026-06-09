@@ -10,11 +10,13 @@
 	let resumo = $state('');
 	let skillsText = $state('');
 	let savedSkills = $state([]);
+	let experiences = $state([]);
+	let education = $state([]);
 
 	let loading = $state(true);
 	let saving = $state(false);
 	let error = $state('');
-	let savedAt = $state(0);
+	let saved = $state(false);
 
 	async function load() {
 		loading = true;
@@ -27,6 +29,19 @@
 			resumo = p.resumo ?? '';
 			savedSkills = p.skills ?? [];
 			skillsText = savedSkills.join(', ');
+			experiences = (p.experiences ?? []).map((e) => ({
+				empresa: e.empresa,
+				cargo: e.cargo,
+				inicio: e.inicio,
+				fim: e.fim,
+				descricao: e.descricao
+			}));
+			education = (p.education ?? []).map((e) => ({
+				instituicao: e.instituicao,
+				curso: e.curso,
+				inicio: e.inicio,
+				fim: e.fim
+			}));
 		} catch (e) {
 			error = e.message;
 		} finally {
@@ -36,22 +51,29 @@
 
 	onMount(load);
 
+	const addExperience = () =>
+		experiences.push({ empresa: '', cargo: '', inicio: '', fim: '', descricao: '' });
+	const removeExperience = (i) => experiences.splice(i, 1);
+	const addEducation = () => education.push({ instituicao: '', curso: '', inicio: '', fim: '' });
+	const removeEducation = (i) => education.splice(i, 1);
+
 	async function save(e) {
 		e.preventDefault();
 		saving = true;
 		error = '';
+		saved = false;
 		try {
 			const skills = skillsText
 				.split(',')
 				.map((s) => s.trim())
 				.filter(Boolean);
-			const p = await api('/api/profile', {
+			const p = await api('/api/cv', {
 				method: 'PUT',
-				body: { nome, titulo, titulo_alvo: tituloAlvo, resumo, skills }
+				body: { nome, titulo, titulo_alvo: tituloAlvo, resumo, skills, experiences, education }
 			});
 			savedSkills = p.skills ?? [];
-			skillsText = savedSkills.join(', '); // reflect normalized/deduped
-			savedAt = Date.now();
+			skillsText = savedSkills.join(', ');
+			saved = true;
 		} catch (e) {
 			error = e.message;
 		} finally {
@@ -70,42 +92,81 @@
 {#if loading}
 	<p class="muted">Carregando…</p>
 {:else}
-	<form class="panel form" onsubmit={save}>
-		<div class="grid">
-			<Input label="Nome" bind:value={nome} />
-			<Input label="Profissão atual" bind:value={titulo} placeholder="Dev Backend Pleno" />
-			<Input label="Profissão almejada" bind:value={tituloAlvo} placeholder="Staff Engineer" />
-		</div>
-
-		<label class="field">
-			<span class="label">Resumo profissional</span>
-			<textarea bind:value={resumo} rows="4" placeholder="Um parágrafo sobre você, sua stack e o que busca."></textarea>
-		</label>
-
-		<label class="field">
-			<span class="label">
-				Skills (vírgula) — usadas no <strong>% de aderência</strong> das vagas
-			</span>
-			<Input bind:value={skillsText} placeholder="Go, React, PostgreSQL, Docker…" />
-		</label>
-
-		{#if savedSkills.length}
-			<div class="skills">
-				{#each savedSkills as s (s)}<span class="skill">{s}</span>{/each}
+	<form onsubmit={save}>
+		<section class="panel">
+			<h2>Identidade</h2>
+			<div class="grid">
+				<Input label="Nome" bind:value={nome} />
+				<Input label="Profissão atual" bind:value={titulo} placeholder="Dev Backend Pleno" />
+				<Input label="Profissão almejada" bind:value={tituloAlvo} placeholder="Staff Engineer" />
 			</div>
-		{/if}
+			<label class="field">
+				<span class="label">Resumo profissional</span>
+				<textarea bind:value={resumo} rows="4" placeholder="Um parágrafo sobre você, sua stack e o que busca."></textarea>
+			</label>
+			<label class="field">
+				<span class="label">Skills (vírgula) — base do <strong>% de aderência</strong> das vagas</span>
+				<Input bind:value={skillsText} placeholder="Go, React, PostgreSQL, Docker…" />
+			</label>
+			{#if savedSkills.length}
+				<div class="skills">
+					{#each savedSkills as s (s)}<span class="skill">{s}</span>{/each}
+				</div>
+			{/if}
+		</section>
+
+		<section class="panel">
+			<div class="panel-head">
+				<h2>Experiências</h2>
+				<Button size="sm" variant="secondary" onclick={addExperience}>+ Experiência</Button>
+			</div>
+			{#if experiences.length === 0}
+				<p class="muted">Nenhuma experiência. Adicione seus cargos anteriores.</p>
+			{/if}
+			{#each experiences as exp, i (i)}
+				<div class="entry">
+					<div class="grid">
+						<Input label="Empresa" bind:value={exp.empresa} />
+						<Input label="Cargo" bind:value={exp.cargo} />
+						<Input label="Início" bind:value={exp.inicio} placeholder="2022" />
+						<Input label="Fim" bind:value={exp.fim} placeholder="atual" />
+					</div>
+					<label class="field">
+						<span class="label">O que você fez</span>
+						<textarea bind:value={exp.descricao} rows="3" placeholder="Responsabilidades, resultados, stack."></textarea>
+					</label>
+					<button type="button" class="del" onclick={() => removeExperience(i)}>Remover experiência</button>
+				</div>
+			{/each}
+		</section>
+
+		<section class="panel">
+			<div class="panel-head">
+				<h2>Educação</h2>
+				<Button size="sm" variant="secondary" onclick={addEducation}>+ Formação</Button>
+			</div>
+			{#if education.length === 0}
+				<p class="muted">Nenhuma formação cadastrada.</p>
+			{/if}
+			{#each education as ed, i (i)}
+				<div class="entry">
+					<div class="grid">
+						<Input label="Instituição" bind:value={ed.instituicao} />
+						<Input label="Curso" bind:value={ed.curso} />
+						<Input label="Início" bind:value={ed.inicio} placeholder="2016" />
+						<Input label="Fim" bind:value={ed.fim} placeholder="2021" />
+					</div>
+					<button type="button" class="del" onclick={() => removeEducation(i)}>Remover formação</button>
+				</div>
+			{/each}
+		</section>
 
 		{#if error}<p class="error">{error}</p>{/if}
 		<div class="actions">
-			{#if savedAt}<span class="saved">Salvo ✓</span>{/if}
+			{#if saved}<span class="ok">Salvo ✓</span>{/if}
 			<Button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Salvar CV'}</Button>
 		</div>
 	</form>
-
-	<p class="hint">
-		As skills viram a base do match com as vagas. Em breve: experiências, adaptação por vaga e
-		export em PDF/DOCX.
-	</p>
 {/if}
 
 <style>
@@ -127,25 +188,40 @@
 		color: var(--color-text);
 		margin: 0;
 	}
+	h2 {
+		font-size: var(--text-lg);
+		font-weight: var(--weight-medium);
+		color: var(--color-text);
+		margin: 0 0 var(--space-4);
+	}
 	.muted {
 		color: var(--color-text-secondary);
+		font-size: var(--text-sm);
 	}
 	.panel {
 		background-color: var(--color-surface);
 		border: var(--border-width-1) solid var(--color-border);
 		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow-sm);
-	}
-	.form {
 		padding: var(--space-6);
+		margin-bottom: var(--space-5);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
 		max-width: var(--max-prose);
 	}
+	.panel-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-4);
+	}
+	.panel-head h2 {
+		margin: 0;
+	}
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 		gap: var(--space-4);
 	}
 	.field {
@@ -167,7 +243,7 @@
 		border: var(--border-width-1) solid var(--color-border);
 		border-radius: var(--radius-md);
 		resize: vertical;
-		min-height: 84px;
+		min-height: 72px;
 	}
 	textarea:focus {
 		outline: none;
@@ -187,25 +263,40 @@
 		background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
 		color: var(--color-accent);
 	}
+	.entry {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+		border: var(--border-width-1) solid var(--color-divider);
+		border-radius: var(--radius-md);
+		padding: var(--space-4);
+	}
+	.del {
+		align-self: flex-start;
+		background: none;
+		border: none;
+		color: var(--color-text-muted);
+		font-size: var(--text-sm);
+		cursor: pointer;
+		padding: 0;
+	}
+	.del:hover {
+		color: var(--color-danger-text);
+	}
 	.actions {
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
 		gap: var(--space-3);
+		max-width: var(--max-prose);
 	}
-	.saved {
+	.ok {
 		font-size: var(--text-sm);
 		color: var(--color-success-text);
 	}
 	.error {
 		color: var(--color-danger-text);
 		font-size: var(--text-sm);
-		margin: 0;
-	}
-	.hint {
-		margin: var(--space-4) 0 0;
-		font-size: var(--text-sm);
-		color: var(--color-text-muted);
 		max-width: var(--max-prose);
 	}
 </style>
