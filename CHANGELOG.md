@@ -29,6 +29,10 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   ADR-0003, UA de browser) e extrai os campos do JSON-LD `JobPosting` que LinkedIn e
   boards embutem (com fallback por LLM quando ausente). Na UI de `/vagas`, colar o link
   preenche o formulário automaticamente (título, empresa, local, descrição, modelo).
+- **Perfil (domínio `cv`) + profissão no header de Vagas:** novo domínio `cv` com o
+  perfil mestre singleton em `/api/profile` (migração `0009`, upsert). O header de
+  `/vagas` mostra a **profissão atual e a almejada** (editável inline) — fundação do
+  CV mestre que cresce na sequência (experiências, adaptação por vaga, export PDF/DOCX).
 
 ### A fazer
 - F3 — `cv` (CV mestre, adaptação por vaga via LLM, export **PDF+DOCX** pure-Go) com

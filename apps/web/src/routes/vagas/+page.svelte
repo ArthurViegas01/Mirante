@@ -3,6 +3,7 @@
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
 	import Select from '$lib/components/Select.svelte';
+	import ProfileHeadline from '$lib/components/ProfileHeadline.svelte';
 	import { api } from '$lib/api.js';
 	import { MODELO_OPTIONS, modeloLabel } from '$lib/jobMeta.js';
 
@@ -116,6 +117,7 @@
 	<div>
 		<p class="eyebrow">Vagas</p>
 		<h1>Vagas</h1>
+		<ProfileHeadline />
 	</div>
 	<Button onclick={() => (showForm ? (showForm = false) : (showForm = true))}>
 		{showForm ? 'Cancelar' : 'Nova vaga'}
