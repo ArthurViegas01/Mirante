@@ -9,9 +9,20 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 
 ## [Não lançado]
 
+### Adicionado
+- **Monitor: rollups horários + pruning (F4, ADR-0006).** O histórico bruto de
+  checks (`check_results`, ~1 linha/min por serviço) agora é compactado para não
+  crescer sem limite. Um worker horário (na inicialização e a cada hora) agrega os
+  checks mais antigos que `MONITOR_RETENTION_DAYS` (env, default 14) em buckets
+  horários (`check_rollups`, migração `0014`: `samples`/`ups`/`sum_latency_ms` por
+  serviço×hora) e **poda** as linhas brutas, numa única transação. O uptime
+  (24h/7d/30d) passa a somar rollups + brutos — disjuntos no tempo, **sem dupla
+  contagem nem perda** de amostras; a sparkline continua lendo os brutos recentes.
+  Multi-instância segue fora de escopo (ADR-0002: app single-instance).
+
 ### A fazer
-- F4 — Monitor avançado (rollups/pruning de `check_results`, multi-instância) e F5
-  (polish, observabilidade, RBAC).
+- F5 — polish, observabilidade (OTel), RBAC, webhooks de alerta. Multi-instância
+  (Redis + leader election) permanece adiada (ADR-0002).
 
 ## [0.6.0] - 2026-06-09
 
