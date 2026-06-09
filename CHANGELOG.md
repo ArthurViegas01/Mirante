@@ -38,6 +38,8 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   página **`/cv`** para gerenciá-las. Em `/vagas`, cada vaga mostra o **% de aderência**
   (overlap das skills exigidas com as suas) e destaca as que você tem (verde) vs as
   faltantes — base determinística do match (refino por LLM virá com as experiências).
+- **CV mestre: experiências e educação** geríveis na página `/cv` (listas com add/remover),
+  persistidas via `PUT /api/cv` (migração `0011`, replace atômico, ids no servidor).
 
 ### Alterado
 - **Monitor agora é centrado no projeto:** a aba Monitor saiu da sidebar; o status ao
@@ -52,10 +54,12 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   e respeitam o tema.
 - **Import de vaga por link:** a descrição vinha resumida; agora devolve o texto
   completo da vaga (prompt ajustado + limites de entrada/saída maiores).
+- **CV:** editar a profissão pelo header de Vagas não apaga mais as skills mestre
+  (`PUT /api/profile` virou update parcial — `skills` opcional).
 
 ### A fazer
-- F3 — `cv`: experiências/educação no CV mestre, **adaptação por vaga via LLM** e
-  **export PDF+DOCX** pure-Go; e CRM de candidaturas em `internal/applications`.
+- F3 — `cv`: **adaptação por vaga via LLM** e **export PDF+DOCX** pure-Go; refino de
+  aderência por LLM; e CRM de candidaturas em `internal/applications`.
 
 ## [0.5.0] - 2026-06-08
 
