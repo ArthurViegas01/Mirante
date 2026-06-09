@@ -22,6 +22,7 @@ import (
 	"github.com/lumni/mirante/internal/platform/ratelimit"
 	"github.com/lumni/mirante/internal/platform/sse"
 	"github.com/lumni/mirante/internal/projects"
+	"github.com/lumni/mirante/internal/subscriptions"
 	"github.com/lumni/mirante/internal/tasks"
 )
 
@@ -79,6 +80,9 @@ func run() error {
 
 	tasksSvc := tasks.NewService(tasks.NewSQLiteRepo(database))
 	tasks.RegisterRoutes(mux, authH.Protect, tasksSvc)
+
+	subsSvc := subscriptions.NewService(subscriptions.NewSQLiteRepo(database))
+	subscriptions.RegisterRoutes(mux, authH.Protect, subsSvc)
 
 	monitorRepo := monitor.NewSQLiteRepo(database)
 	monitorMgr := monitor.NewManager(monitorRepo)
