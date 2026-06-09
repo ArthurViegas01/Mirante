@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/lumni/mirante/internal/applications"
 	"github.com/lumni/mirante/internal/cv"
 	"github.com/lumni/mirante/internal/jobs"
@@ -157,9 +159,14 @@ func run() error {
 		httpserver.RateLimit(ipLimiter),
 	)
 
+	// Outermost: an OTel server span per request (extracts trace context first;
+	// a no-op when no exporter is configured). Method/status land as attributes.
+	traced := otelhttp.NewHandler(handler, "http.server",
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return "HTTP " + r.Method }))
+
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           handler,
+		Handler:           traced,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
