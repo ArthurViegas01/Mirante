@@ -7,7 +7,7 @@
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import { api } from '$lib/api.js';
 	import { monitor } from '$lib/stores/monitor.svelte.js';
-	import { svcVariant, svcLabel, uptimeVariant } from '$lib/serviceStatus.js';
+	import { svcVariant, svcLabel, uptimeVariant, camadaLabel } from '$lib/serviceStatus.js';
 
 	let id = $derived($page.params.id);
 	let detail = $state(null);
@@ -94,6 +94,8 @@
 	<section class="panel">
 		<h2>Configuração</h2>
 		<dl class="config">
+			{#if s.camada}<div><dt>Camada</dt><dd>{camadaLabel(s.camada)}</dd></div>{/if}
+			{#if s.provider}<div><dt>Provedor</dt><dd>{s.provider}</dd></div>{/if}
 			<div><dt>Intervalo</dt><dd>{s.interval_seconds}s</dd></div>
 			<div><dt>Timeout</dt><dd>{s.timeout_ms}ms</dd></div>
 			<div><dt>Degradado &gt;</dt><dd>{s.degraded_threshold_ms}ms</dd></div>

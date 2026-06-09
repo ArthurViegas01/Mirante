@@ -35,6 +35,8 @@ type Service struct {
 	ID                   ServiceID  `json:"id"`
 	ProjectID            string     `json:"project_id"`
 	Nome                 string     `json:"nome"`
+	Provider             string     `json:"provider"` // free label, e.g. "netlify"
+	Camada               string     `json:"camada"`   // frontend|backend|database|outro
 	Kind                 Kind       `json:"kind"`
 	Target               string     `json:"target"`
 	ExpectedStatus       string     `json:"expected_status"`

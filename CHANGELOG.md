@@ -12,6 +12,25 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ### A fazer
 - F3 — Vagas, CV e CRM (sobre o kernel `internal/skills`).
 
+## [0.5.0] - 2026-06-08
+
+Projetos: Stacks & Custos — o status ao vivo de cada peça do projeto e o custo das
+assinaturas, sem sair do projeto. Extensão de Projetos/Monitor (ver ADR-0005).
+
+### Adicionado
+- **Stacks:** serviços do Monitor ganham `provider` (texto livre) e `camada`
+  (frontend/backend/database/outro) via migração `0005`. A project view tem uma
+  seção **Stacks** que agrupa os serviços do projeto por camada e mostra o status ao
+  vivo (SSE), com formulário compacto para adicionar serviço; os forms do Monitor
+  passam a aceitar provedor/camada. Status = checagem dos próprios endpoints
+  (status-de-provedor fica para depois).
+- **Custos:** novo domínio `subscriptions` (migração `0006`) — custo recorrente por
+  projeto, opcionalmente ligado a um serviço (`service_id`, soft-link sem FK), em
+  **BRL/USD sem conversão**, ciclo mensal/anual. REST em `/api/subscriptions`
+  (filtro `?project=`). A project view tem a seção **Custos** (total mensalizado por
+  moeda, add/editar/remover) e há a página global **`/custos`** agrupando as
+  assinaturas por projeto, com totais gerais.
+
 ## [0.4.0] - 2026-06-08
 
 F2 — Tarefas: trabalho em quadro kanban, vinculável a projetos.
@@ -105,7 +124,8 @@ estrutura e artefatos de fundação.
   assinatura **Glow** (`#5EEAD4`) dos elementos "ao vivo" (`--color-live*`).
 - `README.md` (esqueleto) e este `CHANGELOG.md`.
 
-[Não lançado]: https://example.com/mirante/compare/v0.4.0...HEAD
+[Não lançado]: https://example.com/mirante/compare/v0.5.0...HEAD
+[0.5.0]: https://example.com/mirante/compare/v0.4.0...v0.5.0
 [0.4.0]: https://example.com/mirante/compare/v0.3.0...v0.4.0
 [0.3.0]: https://example.com/mirante/compare/v0.2.0...v0.3.0
 [0.2.0]: https://example.com/mirante/compare/v0.1.0...v0.2.0

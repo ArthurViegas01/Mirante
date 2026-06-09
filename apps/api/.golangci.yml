@@ -20,6 +20,11 @@ linters:
         #       (production = Secure; local dev runs over plain http).
         - G115
         - G124
+    misspell:
+      # Domain vocabulary is Portuguese; "anual" (subscriptions cycle) is correct
+      # pt-BR, not a misspelling of the English "annual".
+      ignore-rules:
+        - anual
     revive:
       rules:
         - name: exported

@@ -44,6 +44,8 @@ func (m *Manager) notifyReconcile() {
 type CreateServiceInput struct {
 	ProjectID           string `json:"project_id"`
 	Nome                string `json:"nome"`
+	Provider            string `json:"provider"`
+	Camada              string `json:"camada"`
 	Kind                Kind   `json:"kind"`
 	Target              string `json:"target"`
 	ExpectedStatus      string `json:"expected_status"`
@@ -57,6 +59,8 @@ type CreateServiceInput struct {
 // UpdateServiceInput is a partial update of a service's configuration.
 type UpdateServiceInput struct {
 	Nome                *string `json:"nome"`
+	Provider            *string `json:"provider"`
+	Camada              *string `json:"camada"`
 	Kind                *Kind   `json:"kind"`
 	Target              *string `json:"target"`
 	ExpectedStatus      *string `json:"expected_status"`
@@ -114,6 +118,8 @@ func (m *Manager) CreateService(ctx context.Context, in CreateServiceInput) (*Se
 		ID:                  ServiceID(idgen.New()),
 		ProjectID:           strings.TrimSpace(in.ProjectID),
 		Nome:                strings.TrimSpace(in.Nome),
+		Provider:            strings.TrimSpace(in.Provider),
+		Camada:              strings.TrimSpace(in.Camada),
 		Kind:                in.Kind,
 		Target:              strings.TrimSpace(in.Target),
 		ExpectedStatus:      strings.TrimSpace(in.ExpectedStatus),
@@ -154,6 +160,12 @@ func (m *Manager) UpdateService(ctx context.Context, id ServiceID, in UpdateServ
 	}
 	if in.Nome != nil {
 		svc.Nome = strings.TrimSpace(*in.Nome)
+	}
+	if in.Provider != nil {
+		svc.Provider = strings.TrimSpace(*in.Provider)
+	}
+	if in.Camada != nil {
+		svc.Camada = strings.TrimSpace(*in.Camada)
 	}
 	if in.Kind != nil {
 		svc.Kind = *in.Kind
@@ -246,6 +258,12 @@ func validateService(s *Service) error {
 	}
 	if strings.TrimSpace(s.Nome) == "" {
 		return fmt.Errorf("%w: nome é obrigatório", ErrInvalid)
+	}
+	if err := validate.Var(s.Camada, "omitempty,oneof=frontend backend database outro"); err != nil {
+		return fmt.Errorf("%w: camada deve ser frontend, backend, database ou outro", ErrInvalid)
+	}
+	if len([]rune(s.Provider)) > 40 {
+		return fmt.Errorf("%w: provider muito longo (max 40)", ErrInvalid)
 	}
 	if err := validate.Var(string(s.Kind), "oneof=http tcp db_ping"); err != nil {
 		return fmt.Errorf("%w: kind deve ser http, tcp ou db_ping", ErrInvalid)

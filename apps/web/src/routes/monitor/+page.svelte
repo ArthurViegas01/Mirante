@@ -7,7 +7,7 @@
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import { api } from '$lib/api.js';
 	import { monitor } from '$lib/stores/monitor.svelte.js';
-	import { svcVariant, svcLabel, KIND_OPTIONS } from '$lib/serviceStatus.js';
+	import { svcVariant, svcLabel, KIND_OPTIONS, CAMADA_OPTIONS, camadaLabel } from '$lib/serviceStatus.js';
 
 	let services = $state([]);
 	let projects = $state([]);
@@ -17,6 +17,8 @@
 
 	let projectId = $state('');
 	let nome = $state('');
+	let provider = $state('');
+	let camada = $state('');
 	let kind = $state('http');
 	let target = $state('');
 	let expectedStatus = $state('2xx');
@@ -66,6 +68,8 @@
 				body: {
 					project_id: projectId,
 					nome,
+					provider,
+					camada,
 					kind,
 					target,
 					expected_status: expectedStatus,
@@ -75,7 +79,8 @@
 				}
 			});
 			showForm = false;
-			nome = target = '';
+			nome = target = provider = '';
+			camada = '';
 			await load();
 		} catch (e) {
 			formError = e.message;
@@ -107,6 +112,8 @@
 		<div class="grid">
 			<Select label="Projeto" bind:value={projectId} options={projectOptions} />
 			<Input label="Nome" bind:value={nome} required />
+			<Input label="Provedor" bind:value={provider} placeholder="Netlify, Railway…" />
+			<Select label="Camada" bind:value={camada} options={CAMADA_OPTIONS} />
 			<Select label="Tipo" bind:value={kind} options={KIND_OPTIONS} />
 			<Input label={kind === 'http' ? 'Alvo (URL)' : 'Alvo (host:porta)'} bind:value={target} required />
 			{#if kind === 'http'}
@@ -139,7 +146,11 @@
 				</div>
 				<span class="proj">{projName(s.project_id)}</span>
 				<span class="target">{s.target}</span>
-				<span class="meta">{s.kind} · {s.interval_seconds}s{s.enabled ? '' : ' · pausado'}</span>
+				<span class="meta">
+					{#if s.camada}{camadaLabel(s.camada)}{#if s.provider} · {s.provider}{/if} · {/if}{s.kind} · {s.interval_seconds}s{s.enabled
+						? ''
+						: ' · pausado'}
+				</span>
 			</button>
 		{/each}
 	</div>
