@@ -45,8 +45,8 @@ func (c Config) IsProd() bool { return c.AppEnv == "production" }
 // Load reads and validates configuration from the environment.
 func Load() (Config, error) {
 	c := Config{
-		AppEnv:          env("APP_ENV", "development"),
-		HTTPAddr:        env("HTTP_ADDR", ":8080"),
+		AppEnv:   env("APP_ENV", "development"),
+		HTTPAddr: httpAddr(),
 		WebOrigin:       env("WEB_ORIGIN", "http://localhost:5173"),
 		DatabaseURL:     env("DATABASE_URL", "file:./data/mirante.db"),
 		DatabaseToken:   env("DATABASE_AUTH_TOKEN", ""),
@@ -107,6 +107,18 @@ func Load() (Config, error) {
 	}
 
 	return c, nil
+}
+
+// httpAddr returns the address to listen on, preferring HTTP_ADDR, then PORT
+// (Railway / Heroku convention), then defaulting to :8080.
+func httpAddr() string {
+	if v := os.Getenv("HTTP_ADDR"); v != "" {
+		return v
+	}
+	if p := os.Getenv("PORT"); p != "" {
+		return ":" + p
+	}
+	return ":8080"
 }
 
 func env(key, def string) string {
