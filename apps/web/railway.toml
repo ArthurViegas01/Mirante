@@ -1,0 +1,22 @@
+# Railway deploy for the Mirante web frontend (SvelteKit adapter-node).
+# In the Railway dashboard: set Root Directory = apps/web.
+#
+# Variables to set in the Railway dashboard (Secrets tab):
+#   API_URL  https://<mirante-api>.up.railway.app
+#   ORIGIN   https://<mirante-web>.up.railway.app
+#
+# Variables to set in the Railway dashboard (Variables tab, non-secret):
+#   NODE_ENV  production
+#
+# Railway injects PORT automatically; adapter-node reads it directly.
+# The hooks.server.js proxy forwards /api/* and /healthz to API_URL at runtime.
+
+[build]
+  builder = "DOCKERFILE"
+  dockerfilePath = "Dockerfile"
+
+[deploy]
+  healthcheckPath = "/"
+  healthcheckTimeout = 10
+  restartPolicyType = "ON_FAILURE"
+  restartPolicyMaxRetries = 5

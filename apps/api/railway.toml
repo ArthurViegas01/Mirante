@@ -1,0 +1,27 @@
+# Railway deploy for the Mirante API (Go, single machine, ADR-0002).
+# In the Railway dashboard: set Root Directory = apps/api.
+#
+# Variables to set in the Railway dashboard (Secrets tab):
+#   DATABASE_URL         libsql://mirante-prod-<org>.turso.io
+#   DATABASE_AUTH_TOKEN  <turso token>
+#   APP_SECRET_KEY       <random base64-32>
+#   WEB_ORIGIN           https://<mirante-web>.up.railway.app
+#   GROQ_API_KEY         <optional, for AI features>
+#
+# Variables to set in the Railway dashboard (Variables tab, non-secret):
+#   APP_ENV                 production
+#   OTEL_SERVICE_NAME       mirante-api
+#   MONITOR_RETENTION_DAYS  14
+#
+# The API listens on $PORT injected by Railway (see config.go httpAddr()).
+# Do NOT enable replicas > 1: SSE hub and scheduler are in-process (ADR-0002).
+
+[build]
+  builder = "DOCKERFILE"
+  dockerfilePath = "Dockerfile"
+
+[deploy]
+  healthcheckPath = "/healthz"
+  healthcheckTimeout = 10
+  restartPolicyType = "ON_FAILURE"
+  restartPolicyMaxRetries = 5
