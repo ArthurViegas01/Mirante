@@ -10,6 +10,15 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### Adicionado
+- **Importar projeto do GitHub.** No formulário de novo projeto, cole o link do
+  repositório e clique em **Buscar do GitHub** para pré-preencher nome, codinome,
+  descrição, URL do repo e tags (linguagem principal + topics); repositório
+  arquivado entra como `arquivado`. Novo endpoint `POST /api/projects/import`
+  busca os metadados na API do GitHub pelo fetcher com guarda anti-SSRF
+  ([ADR-0003](docs/adr/0003-two-trust-domain-fetch.md), IPs privados bloqueados) e
+  devolve um rascunho **não persistido** — o usuário revisa e salva. Aceita as
+  formas usuais de link (`https`, com/sem `.git`, caminhos mais profundos e SSH
+  `git@github.com:…`). Espelha o import de link de vaga (F3).
 - **Multiusuário.** O Mirante deixa de ser single-user: cada usuário tem seu
   próprio Mirante privado, no mesmo deploy de instância única ([ADR-0008](docs/adr/0008-multiusuario.md)).
   - **Isolamento por usuário.** Toda tabela de domínio ganha `user_id` (migrações

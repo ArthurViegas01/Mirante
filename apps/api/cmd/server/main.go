@@ -91,7 +91,14 @@ func run() error {
 	mux.HandleFunc("GET /healthz", httpserver.Healthz)
 	authH.RegisterRoutes(mux)
 
-	projectsSvc := projects.NewService(projects.NewSQLiteRepo(database))
+	// Project GitHub import uses the SSRF-guarded external policy (ADR-0003):
+	// private IPs blocked. GitHub's API requires a User-Agent.
+	githubFetcher := httpx.NewFetcher(httpx.Policy{
+		AllowPrivateIPs: false,
+		MaxBodyBytes:    256 << 10,
+		UserAgent:       "Mirante/1.0 (+https://github.com/lumni/mirante)",
+	})
+	projectsSvc := projects.NewService(projects.NewSQLiteRepo(database), githubFetcher)
 	projects.RegisterRoutes(mux, authH.Protect, projectsSvc)
 
 	tasksSvc := tasks.NewService(tasks.NewSQLiteRepo(database))

@@ -17,7 +17,7 @@ func newService(t *testing.T) *Service {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = database.Close() })
 	require.NoError(t, migrate.Up(database.DB))
-	return NewService(NewSQLiteRepo(database))
+	return NewService(NewSQLiteRepo(database), nil)
 }
 
 func TestCreateAndGet(t *testing.T) {

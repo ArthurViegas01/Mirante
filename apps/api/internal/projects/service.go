@@ -6,20 +6,36 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/lumni/mirante/internal/platform/httpx"
 	idgen "github.com/lumni/mirante/internal/platform/id"
 	"github.com/lumni/mirante/internal/platform/validate"
 )
 
-// ErrInvalid wraps validation failures (mapped to HTTP 400).
-var ErrInvalid = errors.New("invalid input")
+// Errors.
+var (
+	// ErrInvalid wraps validation failures (mapped to HTTP 400).
+	ErrInvalid = errors.New("invalid input")
+	// ErrImportUnavailable means GitHub import is off (no fetcher wired).
+	ErrImportUnavailable = errors.New("import unavailable")
+	// ErrImportFailed wraps a failed GitHub import; the wrapped reason is
+	// user-facing, so its message reads as a pt-BR sentence prefix.
+	ErrImportFailed = errors.New("falha ao importar do GitHub")
+)
 
-// Service holds project use cases.
+const defaultGitHubAPI = "https://api.github.com"
+
+// Service holds project use cases. The GitHub fetcher is optional (nil-safe):
+// without it, ImportDraft returns ErrImportUnavailable; all CRUD works regardless.
 type Service struct {
-	repo Repository
+	repo      Repository
+	fetcher   *httpx.Fetcher
+	githubAPI string
 }
 
-// NewService builds the projects service.
-func NewService(repo Repository) *Service { return &Service{repo: repo} }
+// NewService builds the projects service. fetcher may be nil (GitHub import off).
+func NewService(repo Repository, fetcher *httpx.Fetcher) *Service {
+	return &Service{repo: repo, fetcher: fetcher, githubAPI: defaultGitHubAPI}
+}
 
 // CreateInput is the payload for creating a project.
 type CreateInput struct {

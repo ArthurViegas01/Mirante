@@ -27,6 +27,10 @@
 	let saving = $state(false);
 	let formError = $state('');
 
+	let importing = $state(false);
+	let importError = $state('');
+	let imported = $state(false);
+
 	async function load() {
 		loading = true;
 		error = '';
@@ -47,7 +51,33 @@
 		nome = codinome = descricao = repo = tagsText = '';
 		status = 'ideia';
 		visibilidade = 'pessoal';
-		formError = '';
+		formError = importError = '';
+		imported = false;
+	}
+
+	// Paste a GitHub repo link and pre-fill the form from its metadata. Nothing is
+	// saved here — the user reviews and submits. Mirrors the job-link import.
+	async function importFromGitHub() {
+		if (!repo.trim()) return;
+		importing = true;
+		importError = '';
+		imported = false;
+		try {
+			const d = await api('/api/projects/import', { method: 'POST', body: { url: repo } });
+			nome = d.nome || nome;
+			codinome = d.codinome || codinome;
+			descricao = d.descricao || descricao;
+			if (d.repo) repo = d.repo;
+			if (d.tags?.length) tagsText = d.tags.join(', ');
+			if (d.status) status = d.status;
+			imported = true;
+			toasts.success('Dados importados do GitHub');
+		} catch (e) {
+			importError = e.message;
+			toasts.error(e.message);
+		} finally {
+			importing = false;
+		}
 	}
 
 	async function create(e) {
@@ -86,12 +116,27 @@
 
 {#if showForm}
 	<form class="panel form" onsubmit={create}>
+		<div class="import-row">
+			<Input
+				label="Repo do GitHub — preenche o formulário automaticamente"
+				type="url"
+				bind:value={repo}
+				placeholder="https://github.com/usuário/repo"
+			/>
+			<div class="import-btn">
+				<Button variant="secondary" onclick={importFromGitHub} disabled={importing || !repo}>
+					{importing ? 'Buscando…' : 'Buscar do GitHub'}
+				</Button>
+			</div>
+		</div>
+		{#if importError}<p class="error">{importError}</p>{/if}
+		{#if imported}<p class="hint">Preenchido a partir do GitHub. Confira e ajuste antes de salvar.</p>{/if}
+
 		<div class="grid">
 			<Input label="Nome" bind:value={nome} required />
 			<Input label="Codinome" bind:value={codinome} />
 			<Select label="Status" bind:value={status} options={STATUS_OPTIONS} />
 			<Select label="Visibilidade" bind:value={visibilidade} options={VIS_OPTIONS} />
-			<Input label="Repo" bind:value={repo} placeholder="https://github.com/…" />
 			<Input label="Tags (vírgula)" bind:value={tagsText} placeholder="Go, SvelteKit" />
 		</div>
 		<Textarea label="Descrição" bind:value={descricao} rows={3} placeholder="O que é este projeto?" />
@@ -222,6 +267,20 @@
 	.actions {
 		display: flex;
 		justify-content: flex-end;
+	}
+	.import-row {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		gap: var(--space-3);
+		align-items: end;
+	}
+	.import-btn {
+		display: flex;
+	}
+	.hint {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--color-accent);
 	}
 	.sk-row td {
 		cursor: default;
