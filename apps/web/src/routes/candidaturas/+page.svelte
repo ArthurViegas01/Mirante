@@ -1,9 +1,15 @@
 <script>
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import Textarea from '$lib/components/Textarea.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { api } from '$lib/api.js';
+	import { toasts } from '$lib/stores/toast.svelte.js';
+	import { confirm } from '$lib/stores/confirm.svelte.js';
 	import {
 		APP_PIPELINE,
 		APP_STATUS_OPTIONS,
@@ -45,9 +51,11 @@
 	async function changeStatus(app, status) {
 		try {
 			await api(`/api/applications/${app.id}`, { method: 'PATCH', body: { status } });
+			toasts.success('Status atualizado');
 			await load();
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 
@@ -65,19 +73,31 @@
 				body: { proxima_acao: proximaAcao, data_acao: dataAcao, notas }
 			});
 			editingId = '';
+			toasts.success('Candidatura salva');
 			await load();
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 
 	async function remove(app) {
-		if (!confirm(`Remover a candidatura "${app.titulo}"?`)) return;
+		if (
+			!(await confirm.ask({
+				title: 'Excluir candidatura?',
+				message: `A candidatura "${app.titulo}" será removida em definitivo.`,
+				confirmLabel: 'Excluir',
+				danger: true
+			}))
+		)
+			return;
 		try {
 			await api(`/api/applications/${app.id}`, { method: 'DELETE' });
+			toasts.success('Candidatura excluída');
 			await load();
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 </script>
@@ -90,13 +110,45 @@
 </header>
 
 {#if loading}
-	<p class="muted">Carregando…</p>
+	<div class="summary">
+		{#each Array(4) as _, i (i)}
+			<Skeleton w="96px" h="22px" radius="var(--radius-full)" />
+		{/each}
+	</div>
+	<div class="groups">
+		{#each Array(2) as _, i (i)}
+			<section class="group">
+				<p class="group-h"><Skeleton w="120px" h="11px" /></p>
+				<div class="cards">
+					{#each Array(2) as _, j (j)}
+						<article class="card">
+							<div class="card-top">
+								<div class="who">
+									<Skeleton w="65%" h="14px" />
+									<Skeleton w="45%" h="12px" />
+								</div>
+								<Skeleton w="84px" h="26px" />
+							</div>
+							<Skeleton w="80%" h="12px" />
+							<Skeleton w="55%" h="12px" />
+						</article>
+					{/each}
+				</div>
+			</section>
+		{/each}
+	</div>
 {:else if error}
 	<p class="error">{error}</p>
 {:else if apps.length === 0}
-	<div class="panel empty">
-		Nenhuma candidatura ainda. Em <a href="/vagas">Vagas</a>, clique em "Acompanhar" para começar o
-		pipeline.
+	<div class="panel">
+		<EmptyState
+			title="Nenhuma candidatura ainda"
+			description="Acompanhe uma vaga para iniciar o pipeline. Em Vagas, clique em Acompanhar para mover uma oportunidade para cá."
+		>
+			{#snippet children()}
+				<Button onclick={() => goto('/vagas')}>Ver vagas</Button>
+			{/snippet}
+		</EmptyState>
 	</div>
 {:else}
 	<div class="summary">
@@ -137,10 +189,7 @@
 										<Input label="Próxima ação" bind:value={proximaAcao} placeholder="Enviar follow-up" />
 										<Input label="Data" type="date" bind:value={dataAcao} />
 									</div>
-									<label class="field">
-										<span class="label">Notas</span>
-										<textarea bind:value={notas} rows="3"></textarea>
-									</label>
+									<Textarea label="Notas" bind:value={notas} rows={3} placeholder="Observações da candidatura" />
 									<div class="edit-actions">
 										<Button size="sm" onclick={() => saveEdit(app)}>Salvar</Button>
 										<button type="button" class="link" onclick={() => (editingId = '')}>cancelar</button>
@@ -184,9 +233,6 @@
 		color: var(--color-text);
 		margin: 0;
 	}
-	.muted {
-		color: var(--color-text-secondary);
-	}
 	.error {
 		color: var(--color-danger-text);
 		font-size: var(--text-sm);
@@ -196,14 +242,6 @@
 		border: var(--border-width-1) solid var(--color-border);
 		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow-sm);
-	}
-	.empty {
-		padding: var(--space-8);
-		text-align: center;
-		color: var(--color-text-muted);
-	}
-	.empty a {
-		color: var(--color-link);
 	}
 	.summary {
 		display: flex;
@@ -323,31 +361,6 @@
 		display: grid;
 		grid-template-columns: 2fr 1fr;
 		gap: var(--space-3);
-	}
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-	}
-	.label {
-		font-size: 11.5px;
-		font-weight: var(--weight-medium);
-		color: var(--color-text-secondary);
-	}
-	textarea {
-		font-family: var(--font-sans);
-		font-size: 13px;
-		padding: 8px 10px;
-		background-color: var(--color-surface);
-		color: var(--color-text);
-		border: var(--border-width-1) solid var(--color-border);
-		border-radius: var(--radius-md);
-		resize: vertical;
-	}
-	textarea:focus {
-		outline: none;
-		border-color: var(--color-primary);
-		box-shadow: var(--shadow-focus);
 	}
 	.edit-actions {
 		display: flex;

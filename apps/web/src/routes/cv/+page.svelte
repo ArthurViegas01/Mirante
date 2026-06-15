@@ -2,7 +2,11 @@
 	import { onMount } from 'svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import Textarea from '$lib/components/Textarea.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { api } from '$lib/api.js';
+	import { toasts } from '$lib/stores/toast.svelte.js';
 
 	let nome = $state('');
 	let titulo = $state('');
@@ -50,6 +54,7 @@
 			}));
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		} finally {
 			loading = false;
 		}
@@ -87,8 +92,10 @@
 				}));
 			}
 			importText = '';
+			toasts.success('CV estruturado pela IA');
 		} catch (e) {
 			importError = e.message;
+			toasts.error(e.message);
 		} finally {
 			importing = false;
 		}
@@ -122,8 +129,10 @@
 		try {
 			await persist();
 			saved = true;
+			toasts.success('CV salvo');
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		} finally {
 			saving = false;
 		}
@@ -148,8 +157,10 @@
 			a.click();
 			a.remove();
 			URL.revokeObjectURL(url);
+			toasts.success(`${format.toUpperCase()} gerado`);
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		} finally {
 			exporting = '';
 		}
@@ -164,16 +175,30 @@
 </header>
 
 {#if loading}
-	<p class="muted">Carregando…</p>
+	<div aria-hidden="true">
+		{#each Array(3) as _, i (i)}
+			<section class="panel sk-panel">
+				<Skeleton w="160px" h="18px" />
+				<div class="grid">
+					{#each Array(3) as __, j (j)}<Skeleton w="100%" h="34px" radius="var(--radius-md)" block />{/each}
+				</div>
+				<Skeleton w="100%" h="64px" radius="var(--radius-md)" block />
+			</section>
+		{/each}
+	</div>
 {:else}
 	<section class="panel import">
 		<h2>Importar de um texto</h2>
 		<p class="muted">
-			Cole seu CV (ou inventário de skills) — a IA estrutura identidade, skills, experiências e
+			Cole seu CV (ou inventário de skills): a IA estrutura identidade, skills, experiências e
 			educação. Revise e salve.
 		</p>
-		<textarea bind:value={importText} rows="5" placeholder="Cole aqui o texto do seu CV…"></textarea>
-		{#if importError}<p class="error">{importError}</p>{/if}
+		<Textarea
+			bind:value={importText}
+			rows={5}
+			placeholder="Cole aqui o texto do seu CV…"
+			error={importError}
+		/>
 		<div class="actions">
 			<Button variant="secondary" onclick={importCV} disabled={importing || !importText.trim()}>
 				{importing ? 'Estruturando…' : '✨ Estruturar com IA'}
@@ -194,12 +219,14 @@
 				bind:value={contato}
 				placeholder="arthur@email.com · +55 51 … · Porto Alegre · github.com/…"
 			/>
+			<Textarea
+				label="Resumo profissional"
+				bind:value={resumo}
+				rows={4}
+				placeholder="Um parágrafo sobre você, sua stack e o que busca."
+			/>
 			<label class="field">
-				<span class="label">Resumo profissional</span>
-				<textarea bind:value={resumo} rows="4" placeholder="Um parágrafo sobre você, sua stack e o que busca."></textarea>
-			</label>
-			<label class="field">
-				<span class="label">Skills (vírgula) — base do <strong>% de aderência</strong> das vagas</span>
+				<span class="label">Skills (vírgula): base do <strong>% de aderência</strong> das vagas</span>
 				<Input bind:value={skillsText} placeholder="Go, React, PostgreSQL, Docker…" />
 			</label>
 			{#if savedSkills.length}
@@ -215,7 +242,11 @@
 				<Button size="sm" variant="secondary" onclick={addExperience}>+ Experiência</Button>
 			</div>
 			{#if experiences.length === 0}
-				<p class="muted">Nenhuma experiência. Adicione seus cargos anteriores.</p>
+				<EmptyState
+					compact
+					title="Nenhuma experiência"
+					description="Adicione seus cargos anteriores para compor o CV."
+				/>
 			{/if}
 			{#each experiences as exp, i (i)}
 				<div class="entry">
@@ -225,10 +256,12 @@
 						<Input label="Início" bind:value={exp.inicio} placeholder="2022" />
 						<Input label="Fim" bind:value={exp.fim} placeholder="atual" />
 					</div>
-					<label class="field">
-						<span class="label">O que você fez</span>
-						<textarea bind:value={exp.descricao} rows="3" placeholder="Responsabilidades, resultados, stack."></textarea>
-					</label>
+					<Textarea
+						label="O que você fez"
+						bind:value={exp.descricao}
+						rows={3}
+						placeholder="Responsabilidades, resultados, stack."
+					/>
 					<button type="button" class="del" onclick={() => removeExperience(i)}>Remover experiência</button>
 				</div>
 			{/each}
@@ -240,7 +273,7 @@
 				<Button size="sm" variant="secondary" onclick={addEducation}>+ Formação</Button>
 			</div>
 			{#if education.length === 0}
-				<p class="muted">Nenhuma formação cadastrada.</p>
+				<EmptyState compact title="Nenhuma formação cadastrada" description="Adicione cursos e graduações." />
 			{/if}
 			{#each education as ed, i (i)}
 				<div class="entry">
@@ -334,21 +367,8 @@
 		font-weight: var(--weight-medium);
 		color: var(--color-text-secondary);
 	}
-	textarea {
-		font-family: var(--font-sans);
-		font-size: 13px;
-		padding: 10px;
-		background-color: var(--color-surface);
-		color: var(--color-text);
-		border: var(--border-width-1) solid var(--color-border);
-		border-radius: var(--radius-md);
-		resize: vertical;
-		min-height: 72px;
-	}
-	textarea:focus {
-		outline: none;
-		border-color: var(--color-primary);
-		box-shadow: var(--shadow-focus);
+	.sk-panel {
+		gap: var(--space-3);
 	}
 	.skills {
 		display: flex;

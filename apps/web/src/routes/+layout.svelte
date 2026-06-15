@@ -2,16 +2,31 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
+	import { goto, onNavigate } from '$app/navigation';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import NotificationCenter from '$lib/components/NotificationCenter.svelte';
+	import Toaster from '$lib/components/Toaster.svelte';
+	import ConfirmHost from '$lib/components/ConfirmHost.svelte';
 	import { session } from '$lib/stores/session.svelte.js';
-	import { api, setCsrf } from '$lib/api.js';
+	import { api, setCsrf, setUnauthorizedHandler } from '$lib/api.js';
 	import { connectMonitorStream, disconnectMonitorStream } from '$lib/sse.js';
 	import { monitor } from '$lib/stores/monitor.svelte.js';
 
 	let { children } = $props();
+
+	// Cross-page fade via the View Transitions API. Browsers without support fall
+	// back to an instant swap; motion itself is clamped by the reduced-motion
+	// rules in app.css.
+	onNavigate((navigation) => {
+		if (!document.startViewTransition) return;
+		return new Promise((resolve) => {
+			document.startViewTransition(async () => {
+				resolve();
+				await navigation.complete;
+			});
+		});
+	});
 
 	// `ready` flips once the initial /me probe settles, so we don't flash the app
 	// shell (or redirect) before we know whether a session exists.
@@ -20,11 +35,36 @@
 	let path = $derived($page.url.pathname);
 	let isAuthRoute = $derived(path === '/login' || path === '/signup');
 	let authed = $derived(session.authenticated);
+
+	// Mobile drawer state + the current section label shown in the topbar.
+	let navOpen = $state(false);
+	const SECTION_TITLES = {
+		'/': 'Início',
+		'/projetos': 'Projetos',
+		'/tarefas': 'Tarefas',
+		'/custos': 'Custos',
+		'/vagas': 'Vagas',
+		'/cv': 'CV',
+		'/candidaturas': 'Candidaturas'
+	};
+	let pageTitle = $derived(
+		SECTION_TITLES[path] ?? (path.startsWith('/projetos/') ? 'Projeto' : 'Mirante')
+	);
 	// Where an anonymous visitor belongs: first-run setup before an owner exists,
 	// otherwise login.
 	let authDest = $derived(session.needsSetup ? '/signup' : '/login');
 
 	onMount(async () => {
+		// An expired/revoked session (a 401 on a protected route) drops us back to
+		// the right auth route. No-ops on the expected 401 from the probe below,
+		// since no session is established yet.
+		setUnauthorizedHandler(() => {
+			if (session.authenticated) {
+				session.clear();
+				goto(session.needsSetup ? '/signup' : '/login');
+			}
+		});
+
 		// Populate the session if a valid cookie already exists (ignore 401).
 		try {
 			const me = await api('/api/auth/me');
@@ -51,7 +91,7 @@
 	$effect(() => {
 		if (!ready) return;
 		if (!authed && path !== authDest) goto(authDest);
-		else if (authed && isAuthRoute) goto('/projetos');
+		else if (authed && isAuthRoute) goto('/');
 	});
 
 	// Monitor stream follows auth: connect on login, drop on logout. Reactive so
@@ -74,11 +114,26 @@
 	</div>
 {:else if authed}
 	<div class="app">
-		<Sidebar />
+		<Sidebar bind:open={navOpen} />
 		<div class="main">
 			<header class="topbar">
-				<NotificationCenter />
-				<ThemeToggle />
+				<div class="bar-left">
+					<button
+						class="hamburger"
+						onclick={() => (navOpen = true)}
+						aria-label="Abrir menu"
+						aria-expanded={navOpen}
+					>
+						<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
+							<path d="M3 6h18M3 12h18M3 18h18" />
+						</svg>
+					</button>
+					<span class="page-title">{pageTitle}</span>
+				</div>
+				<div class="bar-right">
+					<NotificationCenter />
+					<ThemeToggle />
+				</div>
 			</header>
 			<main class="content">
 				{@render children()}
@@ -89,6 +144,10 @@
 	<!-- Logged out on a protected route: redirecting to /login. -->
 	<div class="boot" aria-hidden="true"></div>
 {/if}
+
+<!-- Global, mounted once: action feedback + confirmation dialogs. -->
+<Toaster />
+<ConfirmHost />
 
 <style>
 	.app {
@@ -104,11 +163,56 @@
 	}
 	.topbar {
 		display: flex;
-		justify-content: flex-end;
+		justify-content: space-between;
 		align-items: center;
 		gap: var(--space-3);
 		padding: var(--space-4) var(--space-6);
 		border-bottom: var(--border-width-1) solid var(--color-divider);
+		position: sticky;
+		top: 0;
+		z-index: 50;
+		background-color: color-mix(in srgb, var(--color-bg) 88%, transparent);
+		backdrop-filter: blur(8px);
+	}
+	.bar-left,
+	.bar-right {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+	.page-title {
+		font-size: var(--text-base);
+		font-weight: var(--weight-semibold);
+		letter-spacing: var(--tracking-snug);
+		color: var(--color-text);
+	}
+	.hamburger {
+		display: none;
+		align-items: center;
+		justify-content: center;
+		width: 34px;
+		height: 34px;
+		border: var(--border-width-1) solid var(--color-border);
+		border-radius: var(--radius-md);
+		background-color: var(--color-surface);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition:
+			border-color var(--dur-fast) var(--ease-out),
+			color var(--dur-fast) var(--ease-out);
+	}
+	.hamburger:hover {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+	}
+	.hamburger:focus-visible {
+		outline: none;
+		box-shadow: var(--shadow-focus);
+	}
+	@media (max-width: 720px) {
+		.hamburger {
+			display: inline-flex;
+		}
 	}
 	.content {
 		flex: 1;

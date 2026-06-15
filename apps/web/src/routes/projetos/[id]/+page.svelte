@@ -5,9 +5,13 @@
 	import Input from '$lib/components/Input.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import ProjectStacks from '$lib/components/ProjectStacks.svelte';
 	import ProjectCosts from '$lib/components/ProjectCosts.svelte';
 	import { api } from '$lib/api.js';
+	import { toasts } from '$lib/stores/toast.svelte.js';
+	import { confirm } from '$lib/stores/confirm.svelte.js';
 	import { STATUS, STATUS_OPTIONS, LINK_KINDS } from '$lib/projectStatus.js';
 	import { STATUS as TASK_STATUS, isOverdue, prazoLabel } from '$lib/taskMeta.js';
 
@@ -52,8 +56,10 @@
 		try {
 			await api(`/api/projects/${id}`, { method: 'PATCH', body: { status } });
 			await load(id);
+			toasts.success('Status atualizado');
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 
@@ -68,32 +74,72 @@
 			linkLabel = linkUrl = '';
 			linkKind = 'other';
 			await load(id);
+			toasts.success('Link adicionado');
 		} catch (e) {
 			linkError = e.message;
+			toasts.error(e.message);
 		}
 	}
 
 	async function removeLink(linkId) {
-		await api(`/api/projects/${id}/links/${linkId}`, { method: 'DELETE' });
-		await load(id);
+		const ok = await confirm.ask({
+			title: 'Remover link?',
+			message: 'O link será removido deste projeto.',
+			confirmLabel: 'Remover',
+			danger: true
+		});
+		if (!ok) return;
+		try {
+			await api(`/api/projects/${id}/links/${linkId}`, { method: 'DELETE' });
+			await load(id);
+			toasts.success('Link removido');
+		} catch (e) {
+			toasts.error(e.message);
+		}
 	}
 
 	async function remove() {
-		if (
-			!confirm(
-				'Excluir este projeto? Os serviços do monitor vão junto; as tarefas são desvinculadas (não apagadas).'
-			)
-		)
-			return;
-		await api(`/api/projects/${id}`, { method: 'DELETE' });
-		goto('/projetos');
+		const ok = await confirm.ask({
+			title: 'Excluir projeto?',
+			message:
+				'Esta ação não pode ser desfeita. Os serviços do monitor vão junto; as tarefas são desvinculadas (não apagadas).',
+			confirmLabel: 'Excluir',
+			danger: true
+		});
+		if (!ok) return;
+		try {
+			await api(`/api/projects/${id}`, { method: 'DELETE' });
+			toasts.success('Projeto excluído');
+			goto('/projetos');
+		} catch (e) {
+			error = e.message;
+			toasts.error(e.message);
+		}
 	}
 </script>
 
 <a class="back" href="/projetos">← Projetos</a>
 
 {#if loading}
-	<p class="muted">Carregando…</p>
+	<div class="sk-detail" aria-hidden="true">
+		<div class="sk-head">
+			<Skeleton w="240px" h="28px" />
+			<Skeleton w="84px" h="22px" radius="var(--radius-full)" />
+		</div>
+		<Skeleton w="70%" h="14px" block />
+		<div class="sk-meta">
+			<Skeleton w="180px" h="13px" />
+			<Skeleton w="120px" h="13px" />
+		</div>
+		<div class="panel sk-panel">
+			<Skeleton w="120px" h="18px" />
+			<Skeleton w="100%" h="40px" radius="var(--radius-md)" block />
+		</div>
+		<div class="panel sk-panel">
+			<Skeleton w="90px" h="18px" />
+			<Skeleton w="100%" h="40px" radius="var(--radius-md)" block />
+		</div>
+	</div>
 {:else if error}
 	<p class="error">{error}</p>
 {:else if project}
@@ -142,7 +188,11 @@
 				{/each}
 			</ul>
 		{:else}
-			<p class="muted">Nenhum link ainda.</p>
+			<EmptyState
+				compact
+				title="Nenhum link ainda"
+				description="Adicione repositórios, deploys ou docs relevantes abaixo."
+			/>
 		{/if}
 		<form class="link-form" onsubmit={addLink}>
 			<Input label="Label" bind:value={linkLabel} required />
@@ -178,9 +228,11 @@
 				{/each}
 			</ul>
 		{:else}
-			<p class="muted">
-				Nenhuma tarefa aberta. <a class="board-link" href={`/tarefas?project=${id}`}>Criar no quadro →</a>
-			</p>
+			<EmptyState compact title="Nenhuma tarefa aberta" description="Tudo em dia por aqui.">
+				{#snippet children()}
+					<a class="board-link" href={`/tarefas?project=${id}`}>Criar no quadro →</a>
+				{/snippet}
+			</EmptyState>
 		{/if}
 	</section>
 
@@ -314,8 +366,26 @@
 	.link-submit {
 		display: flex;
 	}
-	.muted {
-		color: var(--color-text-muted);
+	.sk-detail {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+	}
+	.sk-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-4);
+	}
+	.sk-meta {
+		display: flex;
+		gap: var(--space-4);
+	}
+	.sk-panel {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+		margin-bottom: 0;
 	}
 	.error {
 		color: var(--color-danger-text);

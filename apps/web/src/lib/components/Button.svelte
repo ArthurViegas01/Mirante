@@ -4,17 +4,24 @@
 		size = 'md',
 		type = 'button',
 		disabled = false,
+		full = false,
 		onclick,
 		children
 	} = $props();
 </script>
 
-<button class="btn {variant} {size}" {type} {disabled} {onclick}>
+<button class="btn {variant} {size}" class:full {type} {disabled} {onclick}>
 	{@render children?.()}
 </button>
 
 <style>
 	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		line-height: 1.2;
+		white-space: nowrap;
 		font-family: var(--font-sans);
 		font-weight: var(--weight-semibold);
 		letter-spacing: -0.005em;
@@ -36,6 +43,9 @@
 	.btn:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+	.btn.full {
+		width: 100%;
 	}
 
 	.sm {
@@ -74,5 +84,14 @@
 	.ghost:hover:not(:disabled) {
 		background-color: var(--color-surface-sunken);
 		color: var(--color-text);
+	}
+	.danger {
+		/* primary-text flips white (light) / ink-950 (dark) for legibility on the
+		   theme-shifted danger color. */
+		background-color: var(--color-danger);
+		color: var(--color-primary-text);
+	}
+	.danger:hover:not(:disabled) {
+		background-color: color-mix(in srgb, var(--color-danger) 85%, var(--ink-950));
 	}
 </style>

@@ -1,6 +1,11 @@
 <script>
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import Button from '$lib/components/Button.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { api } from '$lib/api.js';
+	import { toasts } from '$lib/stores/toast.svelte.js';
 	import {
 		formatMoney,
 		sumByCurrency,
@@ -36,6 +41,7 @@
 			projects = proj.projects;
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		} finally {
 			loading = false;
 		}
@@ -58,12 +64,36 @@
 </header>
 
 {#if loading}
-	<p class="muted">Carregando…</p>
+	<div class="groups">
+		{#each Array(2) as _, i (i)}
+			<section class="panel">
+				<div class="group-head">
+					<Skeleton w="40%" h="14px" />
+					<Skeleton w="90px" h="13px" />
+				</div>
+				<ul class="subs">
+					{#each Array(3) as _, j (j)}
+						<li>
+							<Skeleton w="45%" h="13px" />
+							<Skeleton w="110px" h="13px" />
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/each}
+	</div>
 {:else if error}
 	<p class="error">{error}</p>
 {:else if subscriptions.length === 0}
-	<div class="panel empty">
-		Nenhuma assinatura registrada. Adicione custos na seção <strong>Custos</strong> de cada projeto.
+	<div class="panel">
+		<EmptyState
+			title="Nenhuma assinatura registrada"
+			description="As assinaturas são adicionadas na seção de custos de cada projeto. Abra um projeto para registrar a primeira."
+		>
+			{#snippet children()}
+				<Button onclick={() => goto('/projetos')}>Ver projetos</Button>
+			{/snippet}
+		</EmptyState>
 	</div>
 {:else}
 	<div class="groups">
@@ -128,9 +158,6 @@
 		letter-spacing: 0.06em;
 		color: var(--color-text-muted);
 	}
-	.muted {
-		color: var(--color-text-secondary);
-	}
 	.error {
 		color: var(--color-danger-text);
 		font-size: var(--text-sm);
@@ -140,11 +167,6 @@
 		border: var(--border-width-1) solid var(--color-border);
 		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow-sm);
-	}
-	.empty {
-		padding: var(--space-8);
-		text-align: center;
-		color: var(--color-text-muted);
 	}
 	.groups {
 		display: flex;
