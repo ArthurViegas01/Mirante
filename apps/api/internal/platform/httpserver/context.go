@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/lumni/mirante/internal/platform/auth"
+	"github.com/lumni/mirante/internal/platform/tenant"
 )
 
 type ctxKey int
@@ -26,7 +27,9 @@ func RequestIDFrom(ctx context.Context) string {
 
 func withAuth(ctx context.Context, u *auth.User, s *auth.Session) context.Context {
 	ctx = context.WithValue(ctx, ctxUser, u)
-	return context.WithValue(ctx, ctxSession, s)
+	ctx = context.WithValue(ctx, ctxSession, s)
+	// Scope all downstream data access to this owner (read by domain repos).
+	return tenant.WithUserID(ctx, u.ID)
 }
 
 // UserFrom returns the authenticated owner bound to the context.

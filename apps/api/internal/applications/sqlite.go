@@ -7,6 +7,7 @@ import (
 	"time"
 
 	idb "github.com/lumni/mirante/internal/platform/db"
+	"github.com/lumni/mirante/internal/platform/tenant"
 )
 
 type sqliteRepo struct{ db *idb.DB }
@@ -46,24 +47,27 @@ func scanApplication(s rowScanner) (*Application, error) {
 }
 
 func (r *sqliteRepo) Create(ctx context.Context, a *Application) error {
+	uid, _ := tenant.UserID(ctx)
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO applications (id, job_id, titulo, empresa, status, notas, proxima_acao, data_acao)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		string(a.ID), nullable(a.JobID), nullable(a.Titulo), nullable(a.Empresa), string(a.Status),
+		`INSERT INTO applications (id, user_id, job_id, titulo, empresa, status, notas, proxima_acao, data_acao)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		string(a.ID), uid, nullable(a.JobID), nullable(a.Titulo), nullable(a.Empresa), string(a.Status),
 		nullable(a.Notas), nullable(a.ProximaAcao), nullable(a.DataAcao))
 	return err
 }
 
 func (r *sqliteRepo) Get(ctx context.Context, id ID) (*Application, error) {
+	uid, _ := tenant.UserID(ctx)
 	return scanApplication(r.db.QueryRowContext(ctx,
-		`SELECT `+appCols+` FROM applications WHERE id = ?`, string(id)))
+		`SELECT `+appCols+` FROM applications WHERE id = ? AND user_id = ?`, string(id), uid))
 }
 
 func (r *sqliteRepo) List(ctx context.Context, f ListFilter) ([]*Application, error) {
-	query := `SELECT ` + appCols + ` FROM applications`
-	var args []any
+	uid, _ := tenant.UserID(ctx)
+	query := `SELECT ` + appCols + ` FROM applications WHERE user_id = ?`
+	args := []any{uid}
 	if f.Status != "" {
-		query += ` WHERE status = ?`
+		query += ` AND status = ?`
 		args = append(args, f.Status)
 	}
 	query += ` ORDER BY created_at DESC`
@@ -86,11 +90,12 @@ func (r *sqliteRepo) List(ctx context.Context, f ListFilter) ([]*Application, er
 }
 
 func (r *sqliteRepo) Update(ctx context.Context, a *Application) error {
+	uid, _ := tenant.UserID(ctx)
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE applications SET titulo = ?, empresa = ?, status = ?, notas = ?,
-		 proxima_acao = ?, data_acao = ?, updated_at = ? WHERE id = ?`,
+		 proxima_acao = ?, data_acao = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
 		nullable(a.Titulo), nullable(a.Empresa), string(a.Status), nullable(a.Notas),
-		nullable(a.ProximaAcao), nullable(a.DataAcao), idb.FormatTime(time.Now()), string(a.ID))
+		nullable(a.ProximaAcao), nullable(a.DataAcao), idb.FormatTime(time.Now()), string(a.ID), uid)
 	if err != nil {
 		return err
 	}
@@ -98,7 +103,8 @@ func (r *sqliteRepo) Update(ctx context.Context, a *Application) error {
 }
 
 func (r *sqliteRepo) Delete(ctx context.Context, id ID) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM applications WHERE id = ?`, string(id))
+	uid, _ := tenant.UserID(ctx)
+	res, err := r.db.ExecContext(ctx, `DELETE FROM applications WHERE id = ? AND user_id = ?`, string(id), uid)
 	if err != nil {
 		return err
 	}

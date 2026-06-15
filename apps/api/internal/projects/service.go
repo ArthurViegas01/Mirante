@@ -141,6 +141,11 @@ func (s *Service) AddLink(ctx context.Context, projectID ID, in LinkInput) (*Pro
 	if err := validate.Struct(in); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
+	// Ownership check (Get is user-scoped): refuse to attach a link to a project
+	// the caller doesn't own, instead of leaving an orphan row.
+	if _, err := s.repo.Get(ctx, projectID); err != nil {
+		return nil, err
+	}
 	kind := in.Kind
 	if kind == "" {
 		kind = "other"

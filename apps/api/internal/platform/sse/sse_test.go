@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/lumni/mirante/internal/platform/tenant"
 )
 
 func TestHubReplayAndLive(t *testing.T) {
@@ -31,7 +33,7 @@ func TestHubReplayAndLive(t *testing.T) {
 
 	// Wait for the client to register, then publish a live event.
 	require.Eventually(t, func() bool { return hub.Clients() == 1 }, time.Second, 5*time.Millisecond)
-	hub.Emit(7, "monitor.transition", []byte(`{"x":2}`))
+	hub.Emit("", 7, "monitor.transition", []byte(`{"x":2}`))
 
 	got := readFor(resp.Body, 250*time.Millisecond)
 	require.Contains(t, got, "id: 6") // replayed (after 5)
@@ -48,6 +50,39 @@ func TestHubRejectsTooManyClients(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+}
+
+// tenantHandler injects an owner into the request context, standing in for the
+// auth middleware so the hub can scope a connection to a user.
+func tenantHandler(uid string, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.ServeHTTP(w, r.WithContext(tenant.WithUserID(r.Context(), uid)))
+	})
+}
+
+// TestHubPerUserFanout: a live event reaches only its owner's connection, never
+// another user's stream.
+func TestHubPerUserFanout(t *testing.T) {
+	hub := NewHub(nil)
+	srvA := httptest.NewServer(tenantHandler("user-a", hub))
+	defer srvA.Close()
+	srvB := httptest.NewServer(tenantHandler("user-b", hub))
+	defer srvB.Close()
+
+	respA, err := http.Get(srvA.URL)
+	require.NoError(t, err)
+	defer func() { _ = respA.Body.Close() }()
+	respB, err := http.Get(srvB.URL)
+	require.NoError(t, err)
+	defer func() { _ = respB.Body.Close() }()
+
+	require.Eventually(t, func() bool { return hub.Clients() == 2 }, time.Second, 5*time.Millisecond)
+	hub.Emit("user-a", 9, "monitor.transition", []byte(`{"x":1}`))
+
+	gotA := readFor(respA.Body, 250*time.Millisecond)
+	gotB := readFor(respB.Body, 250*time.Millisecond)
+	require.Contains(t, gotA, "id: 9")    // the owner receives it
+	require.NotContains(t, gotB, "id: 9") // the other user never does
 }
 
 // readFor accumulates streamed bytes for d, then closes the body to unblock.

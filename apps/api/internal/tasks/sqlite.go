@@ -9,6 +9,7 @@ import (
 
 	idb "github.com/lumni/mirante/internal/platform/db"
 	idgen "github.com/lumni/mirante/internal/platform/id"
+	"github.com/lumni/mirante/internal/platform/tenant"
 )
 
 type sqliteRepo struct{ db *idb.DB }
@@ -49,17 +50,19 @@ func scanTask(s rowScanner) (*Task, error) {
 }
 
 func (r *sqliteRepo) Create(ctx context.Context, t *Task) error {
+	uid, _ := tenant.UserID(ctx)
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO tasks (id, titulo, descricao, status, prioridade, prazo, project_id, job_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		string(t.ID), t.Titulo, nullable(t.Descricao), string(t.Status), string(t.Prioridade),
+		`INSERT INTO tasks (id, user_id, titulo, descricao, status, prioridade, prazo, project_id, job_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		string(t.ID), uid, t.Titulo, nullable(t.Descricao), string(t.Status), string(t.Prioridade),
 		nullable(t.Prazo), nullable(t.ProjectID), nullable(t.JobID))
 	return err
 }
 
 func (r *sqliteRepo) Get(ctx context.Context, id ID) (*Task, error) {
+	uid, _ := tenant.UserID(ctx)
 	t, err := scanTask(r.db.QueryRowContext(ctx,
-		`SELECT `+taskCols+` FROM tasks WHERE id = ?`, string(id)))
+		`SELECT `+taskCols+` FROM tasks WHERE id = ? AND user_id = ?`, string(id), uid))
 	if err != nil {
 		return nil, err
 	}
@@ -70,11 +73,10 @@ func (r *sqliteRepo) Get(ctx context.Context, id ID) (*Task, error) {
 }
 
 func (r *sqliteRepo) List(ctx context.Context, f ListFilter) ([]*Task, error) {
+	uid, _ := tenant.UserID(ctx)
 	query := `SELECT ` + taskCols + ` FROM tasks`
-	var (
-		conds []string
-		args  []any
-	)
+	conds := []string{"user_id = ?"}
+	args := []any{uid}
 	if f.Status != "" {
 		conds = append(conds, "status = ?")
 		args = append(args, f.Status)
@@ -83,9 +85,7 @@ func (r *sqliteRepo) List(ctx context.Context, f ListFilter) ([]*Task, error) {
 		conds = append(conds, "project_id = ?")
 		args = append(args, f.ProjectID)
 	}
-	if len(conds) > 0 {
-		query += ` WHERE ` + strings.Join(conds, " AND ")
-	}
+	query += ` WHERE ` + strings.Join(conds, " AND ")
 	query += ` ORDER BY created_at DESC`
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -115,11 +115,12 @@ func (r *sqliteRepo) List(ctx context.Context, f ListFilter) ([]*Task, error) {
 }
 
 func (r *sqliteRepo) Update(ctx context.Context, t *Task) error {
+	uid, _ := tenant.UserID(ctx)
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE tasks SET titulo = ?, descricao = ?, status = ?, prioridade = ?, prazo = ?,
-		 project_id = ?, job_id = ?, updated_at = ? WHERE id = ?`,
+		 project_id = ?, job_id = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
 		t.Titulo, nullable(t.Descricao), string(t.Status), string(t.Prioridade), nullable(t.Prazo),
-		nullable(t.ProjectID), nullable(t.JobID), idb.FormatTime(time.Now()), string(t.ID))
+		nullable(t.ProjectID), nullable(t.JobID), idb.FormatTime(time.Now()), string(t.ID), uid)
 	if err != nil {
 		return err
 	}
@@ -127,7 +128,8 @@ func (r *sqliteRepo) Update(ctx context.Context, t *Task) error {
 }
 
 func (r *sqliteRepo) Delete(ctx context.Context, id ID) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM tasks WHERE id = ?`, string(id))
+	uid, _ := tenant.UserID(ctx)
+	res, err := r.db.ExecContext(ctx, `DELETE FROM tasks WHERE id = ? AND user_id = ?`, string(id), uid)
 	if err != nil {
 		return err
 	}
@@ -135,8 +137,10 @@ func (r *sqliteRepo) Delete(ctx context.Context, id ID) error {
 }
 
 func (r *sqliteRepo) SetTags(ctx context.Context, taskID ID, names []string) error {
+	uid, _ := tenant.UserID(ctx)
 	return r.db.WithTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM task_tags WHERE task_id = ?`, string(taskID)); err != nil {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM task_tags WHERE task_id = ? AND user_id = ?`, string(taskID), uid); err != nil {
 			return err
 		}
 		for _, name := range names {
@@ -145,16 +149,17 @@ func (r *sqliteRepo) SetTags(ctx context.Context, taskID ID, names []string) err
 				continue
 			}
 			if _, err := tx.ExecContext(ctx,
-				`INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)`, idgen.New(), name); err != nil {
+				`INSERT OR IGNORE INTO tags (id, user_id, name) VALUES (?, ?, ?)`, idgen.New(), uid, name); err != nil {
 				return err
 			}
 			var tagID string
-			if err := tx.QueryRowContext(ctx, `SELECT id FROM tags WHERE name = ?`, name).Scan(&tagID); err != nil {
+			if err := tx.QueryRowContext(ctx,
+				`SELECT id FROM tags WHERE user_id = ? AND name = ?`, uid, name).Scan(&tagID); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx,
-				`INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?, ?)`,
-				string(taskID), tagID); err != nil {
+				`INSERT OR IGNORE INTO task_tags (task_id, tag_id, user_id) VALUES (?, ?, ?)`,
+				string(taskID), tagID, uid); err != nil {
 				return err
 			}
 		}
@@ -163,10 +168,11 @@ func (r *sqliteRepo) SetTags(ctx context.Context, taskID ID, names []string) err
 }
 
 func (r *sqliteRepo) listTags(ctx context.Context, taskID ID) ([]string, error) {
+	uid, _ := tenant.UserID(ctx)
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT t.name FROM tags t
 		 JOIN task_tags tt ON tt.tag_id = t.id
-		 WHERE tt.task_id = ? ORDER BY t.name`, string(taskID))
+		 WHERE tt.task_id = ? AND tt.user_id = ? ORDER BY t.name`, string(taskID), uid)
 	if err != nil {
 		return nil, err
 	}

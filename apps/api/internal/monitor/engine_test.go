@@ -41,7 +41,7 @@ func (c *scriptChecker) Check(_ context.Context, _ *Service) Sample {
 
 type captureSink struct{ count int }
 
-func (s *captureSink) Emit(_ int64, _ string, _ []byte) { s.count++ }
+func (s *captureSink) Emit(_ string, _ int64, _ string, _ []byte) { s.count++ }
 
 func newService(id string) *Service {
 	return &Service{

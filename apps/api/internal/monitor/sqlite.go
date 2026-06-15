@@ -7,6 +7,7 @@ import (
 	"time"
 
 	idb "github.com/lumni/mirante/internal/platform/db"
+	"github.com/lumni/mirante/internal/platform/tenant"
 )
 
 type sqliteRepo struct{ db *idb.DB }
@@ -16,7 +17,12 @@ func NewSQLiteRepo(d *idb.DB) Repository { return &sqliteRepo{db: d} }
 
 type rowScanner interface{ Scan(dest ...any) error }
 
-const serviceCols = `id, project_id, nome, provider, camada, kind, target, expected_status,
+// Scoping note: services/alerts/events carry user_id and the API methods filter
+// by the request's owner (tenant). The scheduler/engine/compactor run with no
+// tenant and use the explicitly unscoped methods (ListEnabledServices,
+// RecordCheck, Compact). check_results/check_rollups have no user_id and are
+// isolated via their parent service in read queries.
+const serviceCols = `id, user_id, project_id, nome, provider, camada, kind, target, expected_status,
 	degraded_threshold_ms, timeout_ms, interval_seconds, anti_flap_n, recovery_k,
 	enabled, current_status, consecutive_failures, consecutive_successes,
 	last_checked_at, created_at, updated_at`
@@ -25,12 +31,12 @@ func scanService(s rowScanner) (*Service, error) {
 	var (
 		svc                                  Service
 		idStr, projectID, nome, kind, target string
-		expectedStatus, current              string
+		userID, expectedStatus, current      string
 		provider, camada, lastChecked        sql.NullString
 		enabled                              int
 		createdAt, updatedAt                 string
 	)
-	if err := s.Scan(&idStr, &projectID, &nome, &provider, &camada, &kind, &target, &expectedStatus,
+	if err := s.Scan(&idStr, &userID, &projectID, &nome, &provider, &camada, &kind, &target, &expectedStatus,
 		&svc.DegradedThresholdMs, &svc.TimeoutMs, &svc.IntervalSeconds, &svc.AntiFlapN, &svc.RecoveryK,
 		&enabled, &current, &svc.ConsecutiveFailures, &svc.ConsecutiveSuccesses,
 		&lastChecked, &createdAt, &updatedAt); err != nil {
@@ -40,6 +46,7 @@ func scanService(s rowScanner) (*Service, error) {
 		return nil, err
 	}
 	svc.ID = ServiceID(idStr)
+	svc.UserID = userID
 	svc.ProjectID = projectID
 	svc.Nome = nome
 	svc.Provider = provider.String
@@ -59,31 +66,36 @@ func scanService(s rowScanner) (*Service, error) {
 }
 
 func (r *sqliteRepo) CreateService(ctx context.Context, s *Service) error {
+	uid, _ := tenant.UserID(ctx)
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO services (id, project_id, nome, provider, camada, kind, target, expected_status,
+		`INSERT INTO services (id, user_id, project_id, nome, provider, camada, kind, target, expected_status,
 			degraded_threshold_ms, timeout_ms, interval_seconds, anti_flap_n, recovery_k, enabled)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		string(s.ID), s.ProjectID, s.Nome, nullableStr(s.Provider), nullableStr(s.Camada), string(s.Kind), s.Target, s.ExpectedStatus,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		string(s.ID), uid, s.ProjectID, s.Nome, nullableStr(s.Provider), nullableStr(s.Camada), string(s.Kind), s.Target, s.ExpectedStatus,
 		s.DegradedThresholdMs, s.TimeoutMs, s.IntervalSeconds, s.AntiFlapN, s.RecoveryK, boolToInt(s.Enabled))
 	return err
 }
 
 func (r *sqliteRepo) GetService(ctx context.Context, id ServiceID) (*Service, error) {
+	uid, _ := tenant.UserID(ctx)
 	return scanService(r.db.QueryRowContext(ctx,
-		`SELECT `+serviceCols+` FROM services WHERE id = ?`, string(id)))
+		`SELECT `+serviceCols+` FROM services WHERE id = ? AND user_id = ?`, string(id), uid))
 }
 
 func (r *sqliteRepo) ListServices(ctx context.Context, projectID string) ([]*Service, error) {
-	query := `SELECT ` + serviceCols + ` FROM services`
-	var args []any
+	uid, _ := tenant.UserID(ctx)
+	query := `SELECT ` + serviceCols + ` FROM services WHERE user_id = ?`
+	args := []any{uid}
 	if projectID != "" {
-		query += ` WHERE project_id = ?`
+		query += ` AND project_id = ?`
 		args = append(args, projectID)
 	}
 	query += ` ORDER BY created_at`
 	return r.queryServices(ctx, query, args...)
 }
 
+// ListEnabledServices returns every enabled service across all users. It is the
+// scheduler's system-level enumeration and is intentionally NOT user-scoped.
 func (r *sqliteRepo) ListEnabledServices(ctx context.Context) ([]*Service, error) {
 	return r.queryServices(ctx, `SELECT `+serviceCols+` FROM services WHERE enabled = 1`)
 }
@@ -106,20 +118,23 @@ func (r *sqliteRepo) queryServices(ctx context.Context, query string, args ...an
 }
 
 func (r *sqliteRepo) CountServicesByProject(ctx context.Context, projectID string) (int, error) {
+	uid, _ := tenant.UserID(ctx)
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM services WHERE project_id = ?`, projectID).Scan(&n)
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM services WHERE project_id = ? AND user_id = ?`, projectID, uid).Scan(&n)
 	return n, err
 }
 
 func (r *sqliteRepo) UpdateServiceConfig(ctx context.Context, s *Service) error {
+	uid, _ := tenant.UserID(ctx)
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE services SET nome = ?, provider = ?, camada = ?, kind = ?, target = ?, expected_status = ?,
 			degraded_threshold_ms = ?, timeout_ms = ?, interval_seconds = ?,
 			anti_flap_n = ?, recovery_k = ?, enabled = ?, updated_at = ?
-		 WHERE id = ?`,
+		 WHERE id = ? AND user_id = ?`,
 		s.Nome, nullableStr(s.Provider), nullableStr(s.Camada), string(s.Kind), s.Target, s.ExpectedStatus,
 		s.DegradedThresholdMs, s.TimeoutMs, s.IntervalSeconds, s.AntiFlapN, s.RecoveryK,
-		boolToInt(s.Enabled), idb.FormatTime(time.Now()), string(s.ID))
+		boolToInt(s.Enabled), idb.FormatTime(time.Now()), string(s.ID), uid)
 	if err != nil {
 		return err
 	}
@@ -127,25 +142,30 @@ func (r *sqliteRepo) UpdateServiceConfig(ctx context.Context, s *Service) error 
 }
 
 func (r *sqliteRepo) SetServiceStatus(ctx context.Context, id ServiceID, status Status, resetCounters bool) error {
+	uid, _ := tenant.UserID(ctx)
 	if resetCounters {
 		_, err := r.db.ExecContext(ctx,
-			`UPDATE services SET current_status = ?, consecutive_failures = 0, consecutive_successes = 0 WHERE id = ?`,
-			string(status), string(id))
+			`UPDATE services SET current_status = ?, consecutive_failures = 0, consecutive_successes = 0
+			 WHERE id = ? AND user_id = ?`,
+			string(status), string(id), uid)
 		return err
 	}
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE services SET current_status = ? WHERE id = ?`, string(status), string(id))
+		`UPDATE services SET current_status = ? WHERE id = ? AND user_id = ?`, string(status), string(id), uid)
 	return err
 }
 
 func (r *sqliteRepo) DeleteService(ctx context.Context, id ServiceID) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM services WHERE id = ?`, string(id))
+	uid, _ := tenant.UserID(ctx)
+	res, err := r.db.ExecContext(ctx, `DELETE FROM services WHERE id = ? AND user_id = ?`, string(id), uid)
 	if err != nil {
 		return err
 	}
 	return affected(res)
 }
 
+// RecordCheck is system-level (the engine, no tenant). It stamps the alert and
+// SSE event with the service's owner so they reach only that user.
 func (r *sqliteRepo) RecordCheck(ctx context.Context, in RecordCheckInput) (RecordCheckOutput, error) {
 	var out RecordCheckOutput
 	err := r.db.WithTx(ctx, func(tx *sql.Tx) error {
@@ -174,9 +194,9 @@ func (r *sqliteRepo) RecordCheck(ctx context.Context, in RecordCheckInput) (Reco
 		alert := buildAlert(in.Service, in.From, in.Result.State, in.Result.Reason)
 		alert.CreatedAt = in.CheckedAt
 		if err := tx.QueryRowContext(ctx,
-			`INSERT INTO alerts (service_id, project_id, severity, title, body, from_status, to_status, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-			string(alert.ServiceID), alert.ProjectID, alert.Severity, alert.Title, nullableStr(alert.Body),
+			`INSERT INTO alerts (service_id, user_id, project_id, severity, title, body, from_status, to_status, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			string(alert.ServiceID), in.Service.UserID, alert.ProjectID, alert.Severity, alert.Title, nullableStr(alert.Body),
 			string(alert.FromStatus), string(alert.ToStatus), idb.FormatTime(alert.CreatedAt),
 		).Scan(&alert.ID); err != nil {
 			return err
@@ -188,8 +208,8 @@ func (r *sqliteRepo) RecordCheck(ctx context.Context, in RecordCheckInput) (Reco
 		}
 		ev := Event{Type: "monitor.transition", Data: data, CreatedAt: in.CheckedAt}
 		if err := tx.QueryRowContext(ctx,
-			`INSERT INTO events (type, data, created_at) VALUES (?, ?, ?) RETURNING id`,
-			ev.Type, string(data), idb.FormatTime(ev.CreatedAt),
+			`INSERT INTO events (type, user_id, data, created_at) VALUES (?, ?, ?, ?) RETURNING id`,
+			ev.Type, in.Service.UserID, string(data), idb.FormatTime(ev.CreatedAt),
 		).Scan(&ev.ID); err != nil {
 			return err
 		}
@@ -205,9 +225,12 @@ func (r *sqliteRepo) ListChecks(ctx context.Context, id ServiceID, limit int) ([
 	if limit <= 0 {
 		limit = 60
 	}
+	uid, _ := tenant.UserID(ctx)
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, service_id, checked_at, ok, outcome, latency_ms, status_code, error_kind
-		 FROM check_results WHERE service_id = ? ORDER BY id DESC LIMIT ?`, string(id), limit)
+		 FROM check_results
+		 WHERE service_id = ? AND service_id IN (SELECT id FROM services WHERE user_id = ?)
+		 ORDER BY id DESC LIMIT ?`, string(id), uid, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -239,11 +262,15 @@ func (r *sqliteRepo) ListChecks(ctx context.Context, id ServiceID, limit int) ([
 }
 
 func (r *sqliteRepo) Uptime(ctx context.Context, id ServiceID, windowHours int) (Uptime, error) {
+	uid, _ := tenant.UserID(ctx)
 	since := idb.FormatTime(time.Now().UTC().Add(-time.Duration(windowHours) * time.Hour))
 	var samples, ups int
 	if err := r.db.QueryRowContext(ctx,
 		`SELECT COUNT(*), COALESCE(SUM(CASE WHEN outcome != 'down' THEN 1 ELSE 0 END), 0)
-		 FROM check_results WHERE service_id = ? AND checked_at >= ?`, string(id), since).Scan(&samples, &ups); err != nil {
+		 FROM check_results
+		 WHERE service_id = ? AND checked_at >= ?
+		   AND service_id IN (SELECT id FROM services WHERE user_id = ?)`,
+		string(id), since, uid).Scan(&samples, &ups); err != nil {
 		return Uptime{}, err
 	}
 
@@ -254,7 +281,10 @@ func (r *sqliteRepo) Uptime(ctx context.Context, id ServiceID, windowHours int) 
 	var rSamples, rUps int
 	if err := r.db.QueryRowContext(ctx,
 		`SELECT COALESCE(SUM(samples), 0), COALESCE(SUM(ups), 0)
-		 FROM check_rollups WHERE service_id = ? AND bucket >= ?`, string(id), since[:13]).Scan(&rSamples, &rUps); err != nil {
+		 FROM check_rollups
+		 WHERE service_id = ? AND bucket >= ?
+		   AND service_id IN (SELECT id FROM services WHERE user_id = ?)`,
+		string(id), since[:13], uid).Scan(&rSamples, &rUps); err != nil {
 		return Uptime{}, err
 	}
 	samples += rSamples
@@ -267,10 +297,8 @@ func (r *sqliteRepo) Uptime(ctx context.Context, id ServiceID, windowHours int) 
 	return u, nil
 }
 
-// Compact aggregates raw checks older than `before` into hourly rollups, then
-// prunes them. The UPSERT sums into any existing bucket, so re-running is safe;
-// because `before` is hour-aligned and time only moves forward, an already
-// compacted hour has no surviving raw rows to re-add.
+// Compact is system-level (the retention job, no tenant). It rolls up and prunes
+// raw checks across all services; check_results/check_rollups carry no user_id.
 func (r *sqliteRepo) Compact(ctx context.Context, before time.Time) (int, error) {
 	cutoff := idb.FormatTime(before)
 	var pruned int
@@ -308,12 +336,14 @@ func (r *sqliteRepo) ListAlerts(ctx context.Context, limit int, unreadOnly bool)
 	if limit <= 0 {
 		limit = 50
 	}
-	query := `SELECT id, service_id, project_id, severity, title, body, from_status, to_status, read_at, created_at FROM alerts`
+	uid, _ := tenant.UserID(ctx)
+	query := `SELECT id, service_id, project_id, severity, title, body, from_status, to_status, read_at, created_at
+		 FROM alerts WHERE user_id = ?`
 	if unreadOnly {
-		query += ` WHERE read_at IS NULL`
+		query += ` AND read_at IS NULL`
 	}
 	query += ` ORDER BY id DESC LIMIT ?`
-	rows, err := r.db.QueryContext(ctx, query, limit)
+	rows, err := r.db.QueryContext(ctx, query, uid, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -353,29 +383,38 @@ func scanAlert(s rowScanner) (Alert, error) {
 }
 
 func (r *sqliteRepo) CountUnreadAlerts(ctx context.Context) (int, error) {
+	uid, _ := tenant.UserID(ctx)
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM alerts WHERE read_at IS NULL`).Scan(&n)
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM alerts WHERE read_at IS NULL AND user_id = ?`, uid).Scan(&n)
 	return n, err
 }
 
 func (r *sqliteRepo) MarkAlertRead(ctx context.Context, id int64) error {
+	uid, _ := tenant.UserID(ctx)
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE alerts SET read_at = ? WHERE id = ? AND read_at IS NULL`, idb.FormatTime(time.Now()), id)
+		`UPDATE alerts SET read_at = ? WHERE id = ? AND user_id = ? AND read_at IS NULL`,
+		idb.FormatTime(time.Now()), id, uid)
 	return err
 }
 
 func (r *sqliteRepo) MarkAllAlertsRead(ctx context.Context) error {
+	uid, _ := tenant.UserID(ctx)
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE alerts SET read_at = ? WHERE read_at IS NULL`, idb.FormatTime(time.Now()))
+		`UPDATE alerts SET read_at = ? WHERE user_id = ? AND read_at IS NULL`, idb.FormatTime(time.Now()), uid)
 	return err
 }
 
+// EventsAfter replays missed SSE events for the connecting client, scoped to its
+// owner (the stream runs behind auth, so the context carries the tenant).
 func (r *sqliteRepo) EventsAfter(ctx context.Context, afterID int64, limit int) ([]Event, error) {
 	if limit <= 0 {
 		limit = 100
 	}
+	uid, _ := tenant.UserID(ctx)
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, type, data, created_at FROM events WHERE id > ? ORDER BY id ASC LIMIT ?`, afterID, limit)
+		`SELECT id, type, data, created_at FROM events
+		 WHERE id > ? AND user_id = ? ORDER BY id ASC LIMIT ?`, afterID, uid, limit)
 	if err != nil {
 		return nil, err
 	}

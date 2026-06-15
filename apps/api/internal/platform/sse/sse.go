@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/lumni/mirante/internal/platform/tenant"
 )
 
 // Event is a streamed event with a durable monotonic id.
@@ -26,6 +28,7 @@ type Event struct {
 type ReplayFunc func(ctx context.Context, afterID int64, limit int) ([]Event, error)
 
 type client struct {
+	userID string // events fan out only to this connection's owner
 	ch     chan Event
 	closed chan struct{}
 	once   sync.Once
@@ -53,14 +56,18 @@ func NewHub(replay ReplayFunc) *Hub {
 	}
 }
 
-// Emit implements monitor.EventSink. It broadcasts to all clients, dropping
-// (disconnecting) any whose buffer is full so a slow consumer never blocks the
-// publisher. Evictions happen after releasing the lock (no lock upgrade).
-func (h *Hub) Emit(id int64, eventType string, data []byte) {
+// Emit implements monitor.EventSink. It delivers the event only to the owner's
+// connections (per-user fan-out), dropping (disconnecting) any whose buffer is
+// full so a slow consumer never blocks the publisher. Evictions happen after
+// releasing the lock (no lock upgrade).
+func (h *Hub) Emit(userID string, id int64, eventType string, data []byte) {
 	ev := Event{ID: id, Type: eventType, Data: data}
 	var slow []*client
 	h.mu.Lock()
 	for c := range h.clients {
+		if c.userID != userID {
+			continue
+		}
 		select {
 		case c.ch <- ev:
 		default:
@@ -106,7 +113,8 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c := &client{ch: make(chan Event, h.bufSize), closed: make(chan struct{})}
+	uid, _ := tenant.UserID(r.Context())
+	c := &client{userID: uid, ch: make(chan Event, h.bufSize), closed: make(chan struct{})}
 	if !h.add(c) {
 		http.Error(w, "too many streams", http.StatusServiceUnavailable)
 		return
