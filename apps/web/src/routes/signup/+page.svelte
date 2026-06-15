@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import BrandMark from '$lib/components/BrandMark.svelte';
 	import { api, setCsrf } from '$lib/api.js';
 	import { session } from '$lib/stores/session.svelte.js';
 
@@ -11,6 +12,9 @@
 	let confirm = $state('');
 	let error = $state('');
 	let loading = $state(false);
+
+	let pwError = $derived(password.length > 0 && password.length < 8 ? 'Mínimo de 8 caracteres.' : '');
+	let confirmError = $derived(confirm.length > 0 && confirm !== password ? 'As senhas não conferem.' : '');
 
 	async function submit(e) {
 		e.preventDefault();
@@ -25,16 +29,13 @@
 		}
 		loading = true;
 		try {
-			const res = await api('/api/auth/signup', {
-				method: 'POST',
-				body: { email, password, name }
-			});
+			const res = await api('/api/auth/signup', { method: 'POST', body: { email, password, name } });
 			setCsrf(res.csrf_token);
 			session.csrf = res.csrf_token;
 			session.needsSetup = false;
 			const me = await api('/api/auth/me');
 			session.user = me.user;
-			goto('/projetos');
+			goto('/');
 		} catch (err) {
 			error = err.message || 'Falha ao criar o acesso';
 		} finally {
@@ -43,61 +44,101 @@
 	}
 </script>
 
-<section class="signup">
-	<p class="eyebrow">Mirante</p>
-	<h1>Configurar acesso</h1>
-	<p class="lead">Esta é a primeira vez por aqui. Crie a conta do dono para começar.</p>
+<section class="auth-card">
+	<div class="brand"><BrandMark size={26} /></div>
+	<div class="intro">
+		<p class="eyebrow">Primeiro acesso</p>
+		<h1>Crie a conta do dono</h1>
+		<p class="lead">
+			O Mirante é de um único dono. Esta conta reivindica a instância: depois disso o cadastro
+			fecha.
+		</p>
+	</div>
 	<form onsubmit={submit}>
-		<Input label="Nome" bind:value={name} placeholder="Seu nome (opcional)" />
-		<Input label="E-mail" type="email" bind:value={email} placeholder="voce@example.com" required />
-		<Input label="Senha" type="password" bind:value={password} placeholder="Mín. 8 caracteres" required />
-		<Input label="Confirmar senha" type="password" bind:value={confirm} required />
-		{#if error}<p class="error" role="alert">{error}</p>{/if}
-		<Button type="submit" disabled={loading}>{loading ? 'Criando…' : 'Criar acesso'}</Button>
+		<Input label="Nome" name="name" autocomplete="name" bind:value={name} placeholder="Seu nome (opcional)" />
+		<Input
+			label="E-mail"
+			type="email"
+			name="email"
+			autocomplete="username"
+			bind:value={email}
+			placeholder="voce@example.com"
+			required
+		/>
+		<Input
+			label="Senha"
+			type="password"
+			name="password"
+			autocomplete="new-password"
+			bind:value={password}
+			hint="Mínimo de 8 caracteres"
+			error={pwError}
+			required
+		/>
+		<Input
+			label="Confirmar senha"
+			type="password"
+			name="confirm"
+			autocomplete="new-password"
+			bind:value={confirm}
+			error={confirmError}
+			required
+		/>
+		{#if error}<p class="alert" role="alert">{error}</p>{/if}
+		<Button type="submit" full disabled={loading}>{loading ? 'Criando…' : 'Criar acesso'}</Button>
 	</form>
-	<p class="footer">by Lumni</p>
 </section>
 
 <style>
-	.signup {
-		max-width: 360px;
+	.auth-card {
+		width: 100%;
+		max-width: 420px;
 		margin-inline: auto;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-6);
+		padding: var(--space-8);
+		background-color: var(--color-surface);
+		border: var(--border-width-1) solid var(--color-border);
+		border-radius: var(--radius-2xl);
+		box-shadow: var(--shadow-lg);
+		color: var(--color-text);
+		--mark-fill: var(--color-primary);
+		--word-size: 22px;
+	}
+	.intro {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
 	}
 	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		letter-spacing: var(--tracking-eyebrow);
-		text-transform: uppercase;
-		color: var(--color-text-muted);
-		margin: 0 0 var(--space-2);
+		margin: 0 0 var(--space-1);
 	}
 	h1 {
-		font-size: var(--text-2xl);
+		font-size: var(--text-xl);
 		font-weight: var(--weight-medium);
 		letter-spacing: var(--tracking-snug);
 		color: var(--color-text);
-		margin: 0 0 var(--space-2);
+		margin: 0;
 	}
 	.lead {
 		font-size: var(--text-sm);
 		color: var(--color-text-muted);
-		margin: 0 0 var(--space-6);
+		line-height: var(--leading-normal);
+		margin: 0;
 	}
 	form {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
 	}
-	.error {
-		color: var(--color-danger-text);
-		font-size: var(--text-sm);
+	.alert {
 		margin: 0;
-	}
-	.footer {
-		margin-top: var(--space-8);
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		color: var(--color-text-muted);
-		text-align: center;
+		padding: 10px 12px;
+		border-radius: var(--radius-md);
+		background-color: var(--color-danger-bg);
+		color: var(--color-danger-text);
+		border: var(--border-width-1) solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+		font-size: var(--text-sm);
 	}
 </style>

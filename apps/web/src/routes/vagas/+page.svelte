@@ -2,10 +2,15 @@
 	import { onMount } from 'svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import Textarea from '$lib/components/Textarea.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import ProfileHeadline from '$lib/components/ProfileHeadline.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { api } from '$lib/api.js';
+	import { toasts } from '$lib/stores/toast.svelte.js';
+	import { confirm } from '$lib/stores/confirm.svelte.js';
 	import { MODELO_OPTIONS, modeloLabel } from '$lib/jobMeta.js';
 	import { aderencia, aderenciaVariant } from '$lib/aderencia.js';
 
@@ -47,6 +52,7 @@
 			mySkills = profile.skills ?? [];
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		} finally {
 			loading = false;
 		}
@@ -74,8 +80,10 @@
 			senioridade = d.senioridade || senioridade;
 			if (d.modelo && d.modelo !== 'indefinido') modelo = d.modelo;
 			importFonte = d.fonte;
+			toasts.success('Dados importados do link');
 		} catch (e) {
 			importError = e.message;
+			toasts.error(e.message);
 		} finally {
 			importing = false;
 		}
@@ -92,9 +100,11 @@
 			});
 			showForm = false;
 			resetForm();
+			toasts.success('Vaga adicionada');
 			await load();
 		} catch (e) {
 			formError = e.message;
+			toasts.error(e.message);
 		} finally {
 			saving = false;
 		}
@@ -105,9 +115,11 @@
 		error = '';
 		try {
 			await api(`/api/jobs/${job.id}/enrich`, { method: 'POST' });
+			toasts.success('Vaga enriquecida');
 			await load();
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		} finally {
 			enrichingId = '';
 		}
@@ -127,8 +139,10 @@
 				}
 			});
 			adaptId = job.id;
+			toasts.success('CV adaptado para esta vaga');
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		} finally {
 			adaptingId = '';
 		}
@@ -143,20 +157,32 @@
 				body: { job_id: job.id, titulo: job.titulo, empresa: job.empresa }
 			});
 			trackedIds = new Set([...trackedIds, job.id]);
+			toasts.success('Vaga adicionada ao pipeline');
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		} finally {
 			trackingId = '';
 		}
 	}
 
 	async function remove(job) {
-		if (!confirm(`Excluir a vaga "${job.titulo}"?`)) return;
+		if (
+			!(await confirm.ask({
+				title: 'Excluir vaga?',
+				message: `A vaga "${job.titulo}" será removida em definitivo.`,
+				confirmLabel: 'Excluir',
+				danger: true
+			}))
+		)
+			return;
 		try {
 			await api(`/api/jobs/${job.id}`, { method: 'DELETE' });
+			toasts.success('Vaga excluída');
 			await load();
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 </script>
@@ -176,7 +202,7 @@
 	<form class="panel form" onsubmit={create}>
 		<div class="import-row">
 			<Input
-				label="Link da vaga (LinkedIn, etc.) — preenche o formulário automaticamente"
+				label="Link da vaga (LinkedIn, etc.) preenche o formulário automaticamente"
 				type="url"
 				bind:value={url}
 				placeholder="https://www.linkedin.com/jobs/view/…"
@@ -197,10 +223,12 @@
 			<Input label="Senioridade" bind:value={senioridade} placeholder="júnior, pleno…" />
 			<Input label="Localização" bind:value={localizacao} />
 		</div>
-		<label class="field">
-			<span class="label">Descrição (cole o texto da vaga — as skills são extraídas daqui)</span>
-			<textarea bind:value={descricao} rows="6" placeholder="Responsabilidades, requisitos, stack…"></textarea>
-		</label>
+		<Textarea
+			label="Descrição (cole o texto da vaga, as skills são extraídas daqui)"
+			bind:value={descricao}
+			rows={6}
+			placeholder="Responsabilidades, requisitos, stack…"
+		/>
 		{#if formError}<p class="error">{formError}</p>{/if}
 		<div class="actions">
 			<Button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Adicionar vaga'}</Button>
@@ -211,9 +239,30 @@
 {#if error}<p class="error">{error}</p>{/if}
 
 {#if loading}
-	<p class="muted">Carregando…</p>
+	<div class="list" aria-hidden="true">
+		{#each Array(3) as _, i (i)}
+			<article class="panel card sk-card">
+				<div class="card-head">
+					<Skeleton w="45%" h="18px" />
+					<Skeleton w="80px" h="20px" radius="var(--radius-full)" />
+				</div>
+				<Skeleton w="30%" h="12px" />
+				<Skeleton w="90%" h="12px" block />
+				<div class="skills">
+					{#each Array(4) as __, j (j)}<Skeleton w="56px" h="18px" radius="var(--radius-full)" />{/each}
+				</div>
+			</article>
+		{/each}
+	</div>
 {:else if jobs.length === 0}
-	<div class="panel empty">Nenhuma vaga ainda. Adicione a primeira e cole a descrição.</div>
+	<EmptyState
+		title="Nenhuma vaga ainda"
+		description="Adicione a primeira vaga: cole o link para preencher automaticamente ou registre a descrição manualmente."
+	>
+		{#snippet children()}
+			<Button onclick={() => (showForm = true)}>Nova vaga</Button>
+		{/snippet}
+	</EmptyState>
 {:else}
 	<div class="list">
 		{#each jobs as job (job.id)}
@@ -348,32 +397,6 @@
 		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 		gap: var(--space-4);
 	}
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-	}
-	.label {
-		font-size: 11.5px;
-		font-weight: var(--weight-medium);
-		color: var(--color-text-secondary);
-	}
-	textarea {
-		font-family: var(--font-sans);
-		font-size: 13px;
-		padding: 10px;
-		background-color: var(--color-surface);
-		color: var(--color-text);
-		border: var(--border-width-1) solid var(--color-border);
-		border-radius: var(--radius-md);
-		resize: vertical;
-		min-height: 96px;
-	}
-	textarea:focus {
-		outline: none;
-		border-color: var(--color-primary);
-		box-shadow: var(--shadow-focus);
-	}
 	.actions {
 		display: flex;
 		justify-content: flex-end;
@@ -391,11 +414,6 @@
 		margin: 0;
 		font-size: var(--text-sm);
 		color: var(--color-accent);
-	}
-	.empty {
-		padding: var(--space-8);
-		text-align: center;
-		color: var(--color-text-muted);
 	}
 	.list {
 		display: flex;

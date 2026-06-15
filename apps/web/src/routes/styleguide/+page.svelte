@@ -1,15 +1,34 @@
 <script>
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import Textarea from '$lib/components/Textarea.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import StatCard from '$lib/components/StatCard.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
+	import Modal from '$lib/components/Modal.svelte';
+	import { toasts } from '$lib/stores/toast.svelte.js';
+	import { confirm } from '$lib/stores/confirm.svelte.js';
 
 	let demo = $state('');
+	let demoErr = $state('senha123');
+	let demoArea = $state('');
+	let modalOpen = $state(false);
+
+	async function askDemo() {
+		const ok = await confirm.ask({
+			title: 'Confirmar ação?',
+			message: 'Isto é só uma demonstração do diálogo de confirmação.',
+			confirmLabel: 'Confirmar'
+		});
+		toasts.info(ok ? 'Você confirmou.' : 'Você cancelou.');
+	}
 </script>
 
 <header class="head">
 	<p class="eyebrow">Lumni Design System</p>
 	<h1>Styleguide</h1>
-	<p class="muted">Tokens e componentes base consumidos apenas por role tokens.</p>
+	<p class="muted">Tokens e componentes base, consumidos apenas por role tokens.</p>
 </header>
 
 <section>
@@ -18,7 +37,7 @@
 		<p class="t-display">Display 84</p>
 		<p class="t-h1">Heading 1</p>
 		<p class="t-h3">Heading 3</p>
-		<p class="t-body">Body — o texto funcional padrão, em Figtree, 15px, leading generoso.</p>
+		<p class="t-body">Body: o texto funcional padrão, em Figtree, 15px, leading generoso.</p>
 		<p class="t-serif">Um acento editorial em Instrument Serif.</p>
 		<p class="t-mono">mono · 0042 · /var/run · 2026-06-07</p>
 	</div>
@@ -30,6 +49,7 @@
 		<Button variant="primary">Primary</Button>
 		<Button variant="secondary">Secondary</Button>
 		<Button variant="ghost">Ghost</Button>
+		<Button variant="danger">Danger</Button>
 		<Button variant="primary" size="sm">Small</Button>
 		<Button variant="primary" size="lg">Large</Button>
 		<Button variant="primary" disabled>Disabled</Button>
@@ -37,9 +57,12 @@
 </section>
 
 <section>
-	<h2>Inputs</h2>
-	<div class="panel" style="max-width: 320px">
-		<Input label="Campo de exemplo" bind:value={demo} placeholder="Digite algo…" />
+	<h2>Campos</h2>
+	<div class="panel fields">
+		<Input label="Texto" bind:value={demo} placeholder="Digite algo…" />
+		<Input label="Senha" type="password" bind:value={demo} placeholder="Mostrar/ocultar" />
+		<Input label="Com erro" bind:value={demoErr} error="Este valor é inválido." />
+		<Textarea label="Área de texto" bind:value={demoArea} placeholder="Várias linhas…" rows={3} />
 	</div>
 </section>
 
@@ -52,6 +75,53 @@
 		<StatusBadge status="info" label="Planejado" />
 	</div>
 </section>
+
+<section>
+	<h2>Stat cards</h2>
+	<div class="cards">
+		<StatCard label="Projetos ativos" value="4" hint="6 no total" href="/projetos" />
+		<StatCard label="Serviços no ar" value="3/3" live tone="success" hint="tudo no ar" />
+		<StatCard label="Tarefas abertas" value="7" tone="danger" hint="2 atrasadas" />
+	</div>
+</section>
+
+<section>
+	<h2>Feedback</h2>
+	<div class="panel row">
+		<Button variant="secondary" onclick={() => toasts.success('Tudo certo por aqui.')}>Toast sucesso</Button>
+		<Button variant="secondary" onclick={() => toasts.error('Algo deu errado.')}>Toast erro</Button>
+		<Button variant="secondary" onclick={() => toasts.info('Apenas um aviso.')}>Toast info</Button>
+		<Button variant="secondary" onclick={askDemo}>Abrir confirmação</Button>
+		<Button variant="secondary" onclick={() => (modalOpen = true)}>Abrir modal</Button>
+	</div>
+</section>
+
+<section>
+	<h2>Estados</h2>
+	<div class="two">
+		<div class="panel">
+			<EmptyState title="Nada por aqui" description="Um estado vazio com ícone, título e descrição.">
+				{#snippet children()}<Button size="sm">Criar o primeiro</Button>{/snippet}
+			</EmptyState>
+		</div>
+		<div class="panel sk">
+			<Skeleton w="40%" h="14px" />
+			<Skeleton w="100%" h="34px" radius="var(--radius-md)" />
+			<Skeleton w="80%" h="34px" radius="var(--radius-md)" />
+			<Skeleton w="60%" h="34px" radius="var(--radius-md)" />
+		</div>
+	</div>
+</section>
+
+<Modal bind:open={modalOpen} title="Exemplo de modal">
+	<p class="m-text">
+		Modais aparecem com fade e leve escala, prendem o foco e fecham no Escape ou clicando fora.
+	</p>
+	{#snippet footer()}
+		<Button variant="secondary" onclick={() => (modalOpen = false)}>Fechar</Button>
+		<Button onclick={() => { modalOpen = false; toasts.success('Confirmado no modal.'); }}>Confirmar</Button>
+	{/snippet}
+</Modal>
 
 <style>
 	.head {
@@ -96,6 +166,32 @@
 		flex-wrap: wrap;
 		gap: var(--space-3);
 		align-items: center;
+	}
+	.fields {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+		max-width: 360px;
+	}
+	.cards {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+		gap: var(--space-4);
+	}
+	.two {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+		gap: var(--space-4);
+	}
+	.sk {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+	.m-text {
+		margin: 0;
+		color: var(--color-text-secondary);
+		line-height: var(--leading-relaxed);
 	}
 	.t-display {
 		font-size: var(--text-display);

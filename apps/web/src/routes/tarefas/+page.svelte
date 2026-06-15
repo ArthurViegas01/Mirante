@@ -3,9 +3,14 @@
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import Textarea from '$lib/components/Textarea.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { api } from '$lib/api.js';
+	import { toasts } from '$lib/stores/toast.svelte.js';
+	import { confirm } from '$lib/stores/confirm.svelte.js';
 	import { COLUMNS, STATUS, PRIORITY, PRIORITY_OPTIONS, isOverdue, prazoLabel } from '$lib/taskMeta.js';
 
 	let tasks = $state([]);
@@ -94,9 +99,11 @@
 			});
 			showForm = false;
 			resetForm();
+			toasts.success('Tarefa criada');
 			await load(projectFilter);
 		} catch (e) {
 			formError = e.message;
+			toasts.error(e.message);
 		} finally {
 			saving = false;
 		}
@@ -107,19 +114,31 @@
 		if (!next) return;
 		try {
 			await api(`/api/tasks/${task.id}`, { method: 'PATCH', body: { status: next } });
+			toasts.success(`Movida para ${STATUS[next].label}`);
 			await load(projectFilter);
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 
 	async function remove(task) {
-		if (!confirm('Excluir esta tarefa?')) return;
+		if (
+			!(await confirm.ask({
+				title: 'Excluir tarefa?',
+				message: `A tarefa "${task.titulo}" será removida em definitivo.`,
+				confirmLabel: 'Excluir',
+				danger: true
+			}))
+		)
+			return;
 		try {
 			await api(`/api/tasks/${task.id}`, { method: 'DELETE' });
+			toasts.success('Tarefa excluída');
 			await load(projectFilter);
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 </script>
@@ -154,7 +173,7 @@
 			<Select label="Projeto" bind:value={formProject} options={projectOptions} />
 			<Input label="Tags (vírgula)" bind:value={tagsText} placeholder="frontend, urgente" />
 		</div>
-		<Input label="Descrição" bind:value={descricao} />
+		<Textarea label="Descrição" bind:value={descricao} rows={3} placeholder="Detalhes da tarefa (opcional)" />
 		{#if formError}<p class="error">{formError}</p>{/if}
 		<div class="actions">
 			<Button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Criar tarefa'}</Button>
@@ -163,13 +182,31 @@
 {/if}
 
 {#if loading}
-	<p class="muted">Carregando…</p>
+	<div class="board">
+		{#each COLUMNS as col (col)}
+			<section class="column">
+				<header class="col-head">
+					<StatusBadge status={STATUS[col].variant} label={STATUS[col].label} />
+					<Skeleton w="16px" h="12px" />
+				</header>
+				<div class="cards">
+					{#each [0, 1] as i (i)}
+						<article class="card sk-card">
+							<Skeleton w="64px" h="18px" radius="var(--radius-full)" />
+							<Skeleton w="80%" h="13px" />
+							<Skeleton w="55%" h="12px" />
+						</article>
+					{/each}
+				</div>
+			</section>
+		{/each}
+	</div>
 {:else if error}
 	<p class="error">{error}</p>
 {:else}
 	<div class="board">
 		{#each COLUMNS as col (col)}
-			<section class="column">
+			<section class="column" aria-live="polite">
 				<header class="col-head">
 					<StatusBadge status={STATUS[col].variant} label={STATUS[col].label} />
 					<span class="count">{byStatus(col).length}</span>
@@ -214,7 +251,9 @@
 						</article>
 					{/each}
 					{#if byStatus(col).length === 0}
-						<p class="col-empty">Vazia</p>
+						<div class="col-empty">
+							<EmptyState compact title="Vazia" description="Nenhuma tarefa aqui." />
+						</div>
 					{/if}
 				</div>
 			</section>
@@ -267,9 +306,6 @@
 		outline: none;
 		border-color: var(--color-primary);
 		box-shadow: var(--shadow-focus);
-	}
-	.muted {
-		color: var(--color-text-secondary);
 	}
 	.error {
 		color: var(--color-danger-text);
@@ -328,11 +364,10 @@
 		gap: var(--space-3);
 	}
 	.col-empty {
-		text-align: center;
-		color: var(--color-text-disabled);
-		font-size: var(--text-sm);
-		padding: var(--space-4) 0;
-		margin: 0;
+		opacity: 0.7;
+	}
+	.sk-card {
+		gap: var(--space-2);
 	}
 	.card {
 		background-color: var(--color-surface);

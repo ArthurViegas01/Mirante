@@ -11,6 +11,17 @@ export function getCsrf() {
 	return csrf;
 }
 
+// Global 401 handler. The layout registers a callback so an expired/revoked
+// session (a 401 on a protected route) drops the user back to /login instead of
+// failing silently. Kept as a decoupled callback so api.js never imports the
+// session store. The callback itself decides whether to act (it no-ops on the
+// expected 401 from the initial /me probe, when no session is established).
+let onUnauthorized = null;
+
+export function setUnauthorizedHandler(fn) {
+	onUnauthorized = fn;
+}
+
 export async function api(path, { method = 'GET', body } = {}) {
 	const headers = {};
 	if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -37,6 +48,7 @@ export async function api(path, { method = 'GET', body } = {}) {
 	}
 
 	if (!res.ok) {
+		if (res.status === 401 && onUnauthorized) onUnauthorized();
 		const message = data?.error?.message || res.statusText || 'request failed';
 		throw new Error(message);
 	}

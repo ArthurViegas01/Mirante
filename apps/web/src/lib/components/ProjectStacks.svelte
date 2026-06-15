@@ -5,7 +5,11 @@
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import ProgressBar from '$lib/components/ProgressBar.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { api } from '$lib/api.js';
+	import { toasts } from '$lib/stores/toast.svelte.js';
+	import { confirm } from '$lib/stores/confirm.svelte.js';
 	import { monitor } from '$lib/stores/monitor.svelte.js';
 	import {
 		svcVariant,
@@ -104,24 +108,36 @@
 	async function toggleEnabled(s) {
 		try {
 			await api(`/api/services/${s.id}/enabled`, { method: 'POST', body: { enabled: !s.enabled } });
+			toasts.success(s.enabled ? `"${s.nome}" pausado` : `"${s.nome}" retomado`);
 			await load();
 			if (expandedId === s.id) await loadDetail(s.id);
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 
 	async function removeSvc(s) {
-		if (!confirm(`Excluir o serviço "${s.nome}" e seu histórico?`)) return;
+		if (
+			!(await confirm.ask({
+				title: 'Excluir serviço?',
+				message: `O serviço "${s.nome}" e todo o seu histórico serão removidos.`,
+				confirmLabel: 'Excluir',
+				danger: true
+			}))
+		)
+			return;
 		try {
 			await api(`/api/services/${s.id}`, { method: 'DELETE' });
 			if (expandedId === s.id) {
 				expandedId = '';
 				detail = null;
 			}
+			toasts.success('Serviço excluído');
 			await load();
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 
@@ -138,9 +154,11 @@
 			camada = '';
 			kind = 'http';
 			showForm = false;
+			toasts.success('Serviço adicionado');
 			await load();
 		} catch (e) {
 			formError = e.message;
+			toasts.error(e.message);
 		} finally {
 			saving = false;
 		}
@@ -172,11 +190,26 @@
 	{/if}
 
 	{#if loading}
-		<p class="muted">Carregando…</p>
+		<ul class="svcs sk-list">
+			{#each [0, 1, 2] as i (i)}
+				<li class="sk-row">
+					<Skeleton w="40%" h="14px" />
+					<Skeleton w="56px" h="18px" radius="var(--radius-full)" />
+				</li>
+			{/each}
+		</ul>
 	{:else if error}
 		<p class="error">{error}</p>
 	{:else if services.length === 0}
-		<p class="muted">Nenhum serviço. Adicione as peças do stack (front, back, banco…) para ver o status ao vivo.</p>
+		<EmptyState
+			compact
+			title="Nenhum serviço"
+			description="Adicione as peças do stack (front, back, banco) para ver o status ao vivo."
+		>
+			{#snippet children()}
+				<Button size="sm" onclick={() => (showForm = true)}>Adicionar serviço</Button>
+			{/snippet}
+		</EmptyState>
 	{:else}
 		<div class="groups">
 			{#each groups as g (g.camada)}
@@ -185,7 +218,12 @@
 					<ul class="svcs">
 						{#each g.items as s (s.id)}
 							<li class:open={expandedId === s.id}>
-								<button class="svc" onclick={() => toggle(s)} aria-expanded={expandedId === s.id}>
+								<button
+									class="svc"
+									onclick={() => toggle(s)}
+									aria-expanded={expandedId === s.id}
+									aria-controls={`svc-detail-${s.id}`}
+								>
 									<span class="svc-main">
 										<span class="chevron" class:rot={expandedId === s.id} aria-hidden="true">›</span>
 										<span class="svc-nome">{s.nome}</span>
@@ -198,9 +236,13 @@
 								</button>
 
 								{#if expandedId === s.id}
-									<div class="detail">
+									<div class="detail" id={`svc-detail-${s.id}`}>
 										{#if detailLoading && !detail}
-											<p class="muted small">Carregando…</p>
+											<div class="detail-sk">
+												<Skeleton w="50%" h="12px" />
+												<Skeleton w="100%" h="40px" radius="var(--radius-md)" />
+												<Skeleton w="100%" h="12px" />
+											</div>
 										{:else if detail}
 											<p class="mono target">{detail.service.kind} · {detail.service.target}</p>
 											<Sparkline {points} />
@@ -285,6 +327,20 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
+	}
+	.sk-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		padding: 10px 12px;
+		border: var(--border-width-1) solid var(--color-border);
+		border-radius: var(--radius-md);
+	}
+	.detail-sk {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
 	}
 	.svcs li {
 		border: var(--border-width-1) solid var(--color-border);
@@ -379,14 +435,6 @@
 	}
 	.del:hover {
 		color: var(--color-danger-text);
-	}
-	.muted {
-		color: var(--color-text-secondary);
-		font-size: var(--text-sm);
-	}
-	.muted.small {
-		font-size: 12px;
-		margin: 0;
 	}
 	.error {
 		color: var(--color-danger-text);
