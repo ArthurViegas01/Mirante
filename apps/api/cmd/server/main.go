@@ -24,6 +24,7 @@ import (
 	"github.com/lumni/mirante/internal/platform/httpserver"
 	"github.com/lumni/mirante/internal/platform/httpx"
 	"github.com/lumni/mirante/internal/platform/logging"
+	"github.com/lumni/mirante/internal/platform/mailer"
 	"github.com/lumni/mirante/internal/platform/migrate"
 	"github.com/lumni/mirante/internal/platform/otel"
 	"github.com/lumni/mirante/internal/platform/ratelimit"
@@ -68,6 +69,13 @@ func run() error {
 	log.Info("migrations applied")
 
 	authSvc := auth.NewService(database.DB, cfg.SessionTTL)
+	resetMailer, mailerOK := buildMailer(cfg, log)
+	authSvc.WithMailer(resetMailer, cfg.WebOrigin, cfg.PasswordResetTTL)
+	if mailerOK {
+		log.Info("password reset e-mail enabled", "smtp_host", cfg.SMTPHost)
+	} else {
+		log.Info("password reset e-mail disabled (no SMTP) — reset links are logged to the server")
+	}
 	if err := authSvc.Bootstrap(ctx, cfg.OwnerEmail, cfg.OwnerPassword, cfg.OwnerHash); err != nil {
 		return err
 	}
@@ -242,4 +250,26 @@ func run() error {
 		<-compactDone
 		return err
 	}
+}
+
+// buildMailer constructs the SMTP mailer when SMTP_HOST is configured. A missing
+// host (the dev default) returns (nil, false), so the reset flow logs links to
+// the server instead of e-mailing them. An invalid config disables e-mail too,
+// rather than blocking boot.
+func buildMailer(cfg config.Config, log *slog.Logger) (auth.Mailer, bool) {
+	if cfg.SMTPHost == "" {
+		return nil, false
+	}
+	m, err := mailer.NewSMTP(mailer.Config{
+		Host:     cfg.SMTPHost,
+		Port:     cfg.SMTPPort,
+		Username: cfg.SMTPUsername,
+		Password: cfg.SMTPPassword,
+		From:     cfg.SMTPFrom,
+	})
+	if err != nil {
+		log.Warn("invalid SMTP config — password reset e-mail disabled", "err", err)
+		return nil, false
+	}
+	return m, true
 }

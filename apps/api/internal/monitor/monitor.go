@@ -33,6 +33,7 @@ const (
 // Service is a monitored endpoint belonging to a project.
 type Service struct {
 	ID                   ServiceID  `json:"id"`
+	UserID               string     `json:"-"` // owner; set on read, stamped on write
 	ProjectID            string     `json:"project_id"`
 	Nome                 string     `json:"nome"`
 	Provider             string     `json:"provider"` // free label, e.g. "netlify"

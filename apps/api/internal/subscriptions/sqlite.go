@@ -7,6 +7,7 @@ import (
 	"time"
 
 	idb "github.com/lumni/mirante/internal/platform/db"
+	"github.com/lumni/mirante/internal/platform/tenant"
 )
 
 type sqliteRepo struct{ db *idb.DB }
@@ -48,24 +49,27 @@ func scanSubscription(s rowScanner) (*Subscription, error) {
 }
 
 func (r *sqliteRepo) Create(ctx context.Context, s *Subscription) error {
+	uid, _ := tenant.UserID(ctx)
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO subscriptions (id, project_id, service_id, nome, provider, valor_cents, moeda, ciclo, ativo, notas)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		string(s.ID), s.ProjectID, nullable(s.ServiceID), s.Nome, nullable(s.Provider),
+		`INSERT INTO subscriptions (id, user_id, project_id, service_id, nome, provider, valor_cents, moeda, ciclo, ativo, notas)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		string(s.ID), uid, s.ProjectID, nullable(s.ServiceID), s.Nome, nullable(s.Provider),
 		s.ValorCents, string(s.Moeda), string(s.Ciclo), boolToInt(s.Ativo), nullable(s.Notas))
 	return err
 }
 
 func (r *sqliteRepo) Get(ctx context.Context, id ID) (*Subscription, error) {
+	uid, _ := tenant.UserID(ctx)
 	return scanSubscription(r.db.QueryRowContext(ctx,
-		`SELECT `+subCols+` FROM subscriptions WHERE id = ?`, string(id)))
+		`SELECT `+subCols+` FROM subscriptions WHERE id = ? AND user_id = ?`, string(id), uid))
 }
 
 func (r *sqliteRepo) List(ctx context.Context, f ListFilter) ([]*Subscription, error) {
-	query := `SELECT ` + subCols + ` FROM subscriptions`
-	var args []any
+	uid, _ := tenant.UserID(ctx)
+	query := `SELECT ` + subCols + ` FROM subscriptions WHERE user_id = ?`
+	args := []any{uid}
 	if f.ProjectID != "" {
-		query += ` WHERE project_id = ?`
+		query += ` AND project_id = ?`
 		args = append(args, f.ProjectID)
 	}
 	query += ` ORDER BY created_at`
@@ -88,12 +92,13 @@ func (r *sqliteRepo) List(ctx context.Context, f ListFilter) ([]*Subscription, e
 }
 
 func (r *sqliteRepo) Update(ctx context.Context, s *Subscription) error {
+	uid, _ := tenant.UserID(ctx)
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE subscriptions SET service_id = ?, nome = ?, provider = ?, valor_cents = ?,
-		 moeda = ?, ciclo = ?, ativo = ?, notas = ?, updated_at = ? WHERE id = ?`,
+		 moeda = ?, ciclo = ?, ativo = ?, notas = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
 		nullable(s.ServiceID), s.Nome, nullable(s.Provider), s.ValorCents,
 		string(s.Moeda), string(s.Ciclo), boolToInt(s.Ativo), nullable(s.Notas),
-		idb.FormatTime(time.Now()), string(s.ID))
+		idb.FormatTime(time.Now()), string(s.ID), uid)
 	if err != nil {
 		return err
 	}
@@ -101,7 +106,8 @@ func (r *sqliteRepo) Update(ctx context.Context, s *Subscription) error {
 }
 
 func (r *sqliteRepo) Delete(ctx context.Context, id ID) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM subscriptions WHERE id = ?`, string(id))
+	uid, _ := tenant.UserID(ctx)
+	res, err := r.db.ExecContext(ctx, `DELETE FROM subscriptions WHERE id = ? AND user_id = ?`, string(id), uid)
 	if err != nil {
 		return err
 	}

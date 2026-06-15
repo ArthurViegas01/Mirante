@@ -8,8 +8,9 @@ import (
 
 // EventSink receives live events for the SSE stream. It is implemented by the
 // SSE hub (platform/sse) and wired in cmd/server; monitor never imports the hub.
+// userID routes the event to its owner's connections only (per-user fan-out).
 type EventSink interface {
-	Emit(id int64, eventType string, data []byte)
+	Emit(userID string, id int64, eventType string, data []byte)
 }
 
 // AlertChannel is a pluggable external alert delivery (email/webhook). v1 ships
@@ -87,7 +88,7 @@ func (e *Engine) RunCheck(ctx context.Context, svc *Service) error {
 	svc.ConsecutiveSuccesses = res.ConsecSuccesses
 
 	if out.Event != nil && e.sink != nil {
-		e.sink.Emit(out.Event.ID, out.Event.Type, out.Event.Data)
+		e.sink.Emit(svc.UserID, out.Event.ID, out.Event.Type, out.Event.Data)
 	}
 	if out.Alert != nil && e.notifier != nil {
 		e.notifier.Dispatch(ctx, *out.Alert)

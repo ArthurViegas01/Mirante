@@ -9,6 +9,7 @@ import (
 
 	idb "github.com/lumni/mirante/internal/platform/db"
 	idgen "github.com/lumni/mirante/internal/platform/id"
+	"github.com/lumni/mirante/internal/platform/tenant"
 )
 
 type sqliteRepo struct{ db *idb.DB }
@@ -47,17 +48,19 @@ func scanProject(s rowScanner) (*Project, error) {
 }
 
 func (r *sqliteRepo) Create(ctx context.Context, p *Project) error {
+	uid, _ := tenant.UserID(ctx)
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO projects (id, nome, codinome, descricao, repo, status, visibilidade)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		string(p.ID), p.Nome, nullable(p.Codinome), nullable(p.Descricao), nullable(p.Repo),
+		`INSERT INTO projects (id, user_id, nome, codinome, descricao, repo, status, visibilidade)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		string(p.ID), uid, p.Nome, nullable(p.Codinome), nullable(p.Descricao), nullable(p.Repo),
 		string(p.Status), string(p.Visibilidade))
 	return err
 }
 
 func (r *sqliteRepo) Get(ctx context.Context, id ID) (*Project, error) {
+	uid, _ := tenant.UserID(ctx)
 	p, err := scanProject(r.db.QueryRowContext(ctx,
-		`SELECT `+projectCols+` FROM projects WHERE id = ?`, string(id)))
+		`SELECT `+projectCols+` FROM projects WHERE id = ? AND user_id = ?`, string(id), uid))
 	if err != nil {
 		return nil, err
 	}
@@ -71,10 +74,11 @@ func (r *sqliteRepo) Get(ctx context.Context, id ID) (*Project, error) {
 }
 
 func (r *sqliteRepo) List(ctx context.Context, f ListFilter) ([]*Project, error) {
-	query := `SELECT ` + projectCols + ` FROM projects`
-	var args []any
+	uid, _ := tenant.UserID(ctx)
+	query := `SELECT ` + projectCols + ` FROM projects WHERE user_id = ?`
+	args := []any{uid}
 	if f.Status != "" {
-		query += ` WHERE status = ?`
+		query += ` AND status = ?`
 		args = append(args, f.Status)
 	}
 	query += ` ORDER BY updated_at DESC`
@@ -106,11 +110,12 @@ func (r *sqliteRepo) List(ctx context.Context, f ListFilter) ([]*Project, error)
 }
 
 func (r *sqliteRepo) Update(ctx context.Context, p *Project) error {
+	uid, _ := tenant.UserID(ctx)
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE projects SET nome = ?, codinome = ?, descricao = ?, repo = ?, status = ?,
-		 visibilidade = ?, updated_at = ? WHERE id = ?`,
+		 visibilidade = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
 		p.Nome, nullable(p.Codinome), nullable(p.Descricao), nullable(p.Repo),
-		string(p.Status), string(p.Visibilidade), idb.FormatTime(time.Now()), string(p.ID))
+		string(p.Status), string(p.Visibilidade), idb.FormatTime(time.Now()), string(p.ID), uid)
 	if err != nil {
 		return err
 	}
@@ -118,7 +123,8 @@ func (r *sqliteRepo) Update(ctx context.Context, p *Project) error {
 }
 
 func (r *sqliteRepo) Delete(ctx context.Context, id ID) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM projects WHERE id = ?`, string(id))
+	uid, _ := tenant.UserID(ctx)
+	res, err := r.db.ExecContext(ctx, `DELETE FROM projects WHERE id = ? AND user_id = ?`, string(id), uid)
 	if err != nil {
 		return err
 	}
@@ -126,16 +132,19 @@ func (r *sqliteRepo) Delete(ctx context.Context, id ID) error {
 }
 
 func (r *sqliteRepo) AddLink(ctx context.Context, l *Link) error {
+	uid, _ := tenant.UserID(ctx)
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO project_links (id, project_id, label, url, kind, sort_order)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		string(l.ID), string(l.ProjectID), l.Label, l.URL, l.Kind, l.SortOrder)
+		`INSERT INTO project_links (id, user_id, project_id, label, url, kind, sort_order)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		string(l.ID), uid, string(l.ProjectID), l.Label, l.URL, l.Kind, l.SortOrder)
 	return err
 }
 
 func (r *sqliteRepo) RemoveLink(ctx context.Context, projectID, linkID ID) error {
+	uid, _ := tenant.UserID(ctx)
 	res, err := r.db.ExecContext(ctx,
-		`DELETE FROM project_links WHERE id = ? AND project_id = ?`, string(linkID), string(projectID))
+		`DELETE FROM project_links WHERE id = ? AND project_id = ? AND user_id = ?`,
+		string(linkID), string(projectID), uid)
 	if err != nil {
 		return err
 	}
@@ -143,8 +152,10 @@ func (r *sqliteRepo) RemoveLink(ctx context.Context, projectID, linkID ID) error
 }
 
 func (r *sqliteRepo) SetTags(ctx context.Context, projectID ID, names []string) error {
+	uid, _ := tenant.UserID(ctx)
 	return r.db.WithTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM project_tags WHERE project_id = ?`, string(projectID)); err != nil {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM project_tags WHERE project_id = ? AND user_id = ?`, string(projectID), uid); err != nil {
 			return err
 		}
 		for _, name := range names {
@@ -153,16 +164,17 @@ func (r *sqliteRepo) SetTags(ctx context.Context, projectID ID, names []string) 
 				continue
 			}
 			if _, err := tx.ExecContext(ctx,
-				`INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)`, idgen.New(), name); err != nil {
+				`INSERT OR IGNORE INTO tags (id, user_id, name) VALUES (?, ?, ?)`, idgen.New(), uid, name); err != nil {
 				return err
 			}
 			var tagID string
-			if err := tx.QueryRowContext(ctx, `SELECT id FROM tags WHERE name = ?`, name).Scan(&tagID); err != nil {
+			if err := tx.QueryRowContext(ctx,
+				`SELECT id FROM tags WHERE user_id = ? AND name = ?`, uid, name).Scan(&tagID); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx,
-				`INSERT OR IGNORE INTO project_tags (project_id, tag_id) VALUES (?, ?)`,
-				string(projectID), tagID); err != nil {
+				`INSERT OR IGNORE INTO project_tags (project_id, tag_id, user_id) VALUES (?, ?, ?)`,
+				string(projectID), tagID, uid); err != nil {
 				return err
 			}
 		}
@@ -171,9 +183,11 @@ func (r *sqliteRepo) SetTags(ctx context.Context, projectID ID, names []string) 
 }
 
 func (r *sqliteRepo) listLinks(ctx context.Context, projectID ID) ([]Link, error) {
+	uid, _ := tenant.UserID(ctx)
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, project_id, label, url, kind, sort_order, created_at
-		 FROM project_links WHERE project_id = ? ORDER BY sort_order, created_at`, string(projectID))
+		 FROM project_links WHERE project_id = ? AND user_id = ? ORDER BY sort_order, created_at`,
+		string(projectID), uid)
 	if err != nil {
 		return nil, err
 	}
@@ -198,10 +212,11 @@ func (r *sqliteRepo) listLinks(ctx context.Context, projectID ID) ([]Link, error
 }
 
 func (r *sqliteRepo) listTags(ctx context.Context, projectID ID) ([]string, error) {
+	uid, _ := tenant.UserID(ctx)
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT t.name FROM tags t
 		 JOIN project_tags pt ON pt.tag_id = t.id
-		 WHERE pt.project_id = ? ORDER BY t.name`, string(projectID))
+		 WHERE pt.project_id = ? AND pt.user_id = ? ORDER BY t.name`, string(projectID), uid)
 	if err != nil {
 		return nil, err
 	}

@@ -7,10 +7,8 @@ import (
 
 	idb "github.com/lumni/mirante/internal/platform/db"
 	idgen "github.com/lumni/mirante/internal/platform/id"
+	"github.com/lumni/mirante/internal/platform/tenant"
 )
-
-// profileID is the fixed key of the singleton row.
-const profileID = "owner"
 
 type sqliteRepo struct{ db *idb.DB }
 
@@ -18,12 +16,13 @@ type sqliteRepo struct{ db *idb.DB }
 func NewSQLiteRepo(d *idb.DB) Repository { return &sqliteRepo{db: d} }
 
 func (r *sqliteRepo) GetProfile(ctx context.Context) (*Profile, error) {
+	uid, _ := tenant.UserID(ctx)
 	var (
 		nome, titulo, tituloAlvo, contato, resumo, updatedAt sql.NullString
 		p                                                    Profile
 	)
 	err := r.db.QueryRowContext(ctx,
-		`SELECT nome, titulo, titulo_alvo, contato, resumo, updated_at FROM cv_profile WHERE id = ?`, profileID).
+		`SELECT nome, titulo, titulo_alvo, contato, resumo, updated_at FROM cv_profile WHERE user_id = ?`, uid).
 		Scan(&nome, &titulo, &tituloAlvo, &contato, &resumo, &updatedAt)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -53,7 +52,8 @@ func (r *sqliteRepo) GetProfile(ctx context.Context) (*Profile, error) {
 }
 
 func (r *sqliteRepo) listSkills(ctx context.Context) ([]string, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT skill FROM cv_skills ORDER BY skill`)
+	uid, _ := tenant.UserID(ctx)
+	rows, err := r.db.QueryContext(ctx, `SELECT skill FROM cv_skills WHERE user_id = ? ORDER BY skill`, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +70,9 @@ func (r *sqliteRepo) listSkills(ctx context.Context) ([]string, error) {
 }
 
 func (r *sqliteRepo) listExperiences(ctx context.Context) ([]Experience, error) {
+	uid, _ := tenant.UserID(ctx)
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, empresa, cargo, inicio, fim, descricao FROM cv_experience ORDER BY ordem, id`)
+		`SELECT id, empresa, cargo, inicio, fim, descricao FROM cv_experience WHERE user_id = ? ORDER BY ordem, id`, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -93,8 +94,9 @@ func (r *sqliteRepo) listExperiences(ctx context.Context) ([]Experience, error) 
 }
 
 func (r *sqliteRepo) listEducation(ctx context.Context) ([]Education, error) {
+	uid, _ := tenant.UserID(ctx)
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, instituicao, curso, inicio, fim FROM cv_education ORDER BY ordem, id`)
+		`SELECT id, instituicao, curso, inicio, fim FROM cv_education WHERE user_id = ? ORDER BY ordem, id`, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -116,48 +118,51 @@ func (r *sqliteRepo) listEducation(ctx context.Context) ([]Education, error) {
 }
 
 func (r *sqliteRepo) SaveCV(ctx context.Context, p *Profile) error {
+	uid, _ := tenant.UserID(ctx)
 	return r.db.WithTx(ctx, func(tx *sql.Tx) error {
+		// One profile row per user (ux_cv_profile_user); upsert keyed by user_id.
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO cv_profile (id, nome, titulo, titulo_alvo, contato, resumo, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-			 ON CONFLICT(id) DO UPDATE SET
+			`INSERT INTO cv_profile (id, user_id, nome, titulo, titulo_alvo, contato, resumo, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			 ON CONFLICT(user_id) DO UPDATE SET
 			   nome = excluded.nome, titulo = excluded.titulo, titulo_alvo = excluded.titulo_alvo,
 			   contato = excluded.contato, resumo = excluded.resumo, updated_at = excluded.updated_at`,
-			profileID, nullable(p.Nome), nullable(p.Titulo), nullable(p.TituloAlvo),
+			idgen.New(), uid, nullable(p.Nome), nullable(p.Titulo), nullable(p.TituloAlvo),
 			nullable(p.Contato), nullable(p.Resumo)); err != nil {
 			return err
 		}
 
-		if _, err := tx.ExecContext(ctx, `DELETE FROM cv_skills`); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM cv_skills WHERE user_id = ?`, uid); err != nil {
 			return err
 		}
 		for _, sk := range p.Skills {
-			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO cv_skills (skill) VALUES (?)`, sk); err != nil {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT OR IGNORE INTO cv_skills (user_id, skill) VALUES (?, ?)`, uid, sk); err != nil {
 				return err
 			}
 		}
 
-		if _, err := tx.ExecContext(ctx, `DELETE FROM cv_experience`); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM cv_experience WHERE user_id = ?`, uid); err != nil {
 			return err
 		}
 		for i, e := range p.Experiences {
 			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO cv_experience (id, empresa, cargo, inicio, fim, descricao, ordem)
-				 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-				idgen.New(), nullable(e.Empresa), nullable(e.Cargo), nullable(e.Inicio),
+				`INSERT INTO cv_experience (id, user_id, empresa, cargo, inicio, fim, descricao, ordem)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				idgen.New(), uid, nullable(e.Empresa), nullable(e.Cargo), nullable(e.Inicio),
 				nullable(e.Fim), nullable(e.Descricao), i); err != nil {
 				return err
 			}
 		}
 
-		if _, err := tx.ExecContext(ctx, `DELETE FROM cv_education`); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM cv_education WHERE user_id = ?`, uid); err != nil {
 			return err
 		}
 		for i, e := range p.Education {
 			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO cv_education (id, instituicao, curso, inicio, fim, ordem)
-				 VALUES (?, ?, ?, ?, ?, ?)`,
-				idgen.New(), nullable(e.Instituicao), nullable(e.Curso), nullable(e.Inicio),
+				`INSERT INTO cv_education (id, user_id, instituicao, curso, inicio, fim, ordem)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+				idgen.New(), uid, nullable(e.Instituicao), nullable(e.Curso), nullable(e.Inicio),
 				nullable(e.Fim), i); err != nil {
 				return err
 			}

@@ -33,7 +33,11 @@
 	let ready = $state(false);
 
 	let path = $derived($page.url.pathname);
-	let isAuthRoute = $derived(path === '/login' || path === '/signup');
+	// Public screens, reachable while logged out. Login is the single entry point;
+	// the others are linked from it (signup, password recovery).
+	const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password'];
+	let isAuthRoute = $derived(AUTH_ROUTES.includes(path));
+	let isAdminRoute = $derived(path.startsWith('/admin'));
 	let authed = $derived(session.authenticated);
 
 	// Mobile drawer state + the current section label shown in the topbar.
@@ -50,18 +54,15 @@
 	let pageTitle = $derived(
 		SECTION_TITLES[path] ?? (path.startsWith('/projetos/') ? 'Projeto' : 'Mirante')
 	);
-	// Where an anonymous visitor belongs: first-run setup before an owner exists,
-	// otherwise login.
-	let authDest = $derived(session.needsSetup ? '/signup' : '/login');
 
 	onMount(async () => {
 		// An expired/revoked session (a 401 on a protected route) drops us back to
-		// the right auth route. No-ops on the expected 401 from the probe below,
-		// since no session is established yet.
+		// login. No-ops on the expected 401 from the probe below, since no session
+		// is established yet.
 		setUnauthorizedHandler(() => {
 			if (session.authenticated) {
 				session.clear();
-				goto(session.needsSetup ? '/signup' : '/login');
+				goto('/login');
 			}
 		});
 
@@ -86,12 +87,17 @@
 		}
 	});
 
-	// Auth guard: send anonymous visitors to the right auth route (signup before
-	// an owner exists, else login); send logged-in users off the auth routes.
+	// Auth guard: anonymous visitors always land on login (the single entry point),
+	// from which signup and recovery are linked; logged-in users are kept off the
+	// public auth screens.
 	$effect(() => {
 		if (!ready) return;
-		if (!authed && path !== authDest) goto(authDest);
-		else if (authed && isAuthRoute) goto('/');
+		if (authed) {
+			if (isAuthRoute) goto('/');
+			else if (isAdminRoute && !session.isAdmin) goto('/'); // admin-only area
+		} else if (!isAuthRoute) {
+			goto('/login');
+		}
 	});
 
 	// Monitor stream follows auth: connect on login, drop on logout. Reactive so

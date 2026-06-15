@@ -8,6 +8,7 @@ import (
 	"time"
 
 	idb "github.com/lumni/mirante/internal/platform/db"
+	"github.com/lumni/mirante/internal/platform/tenant"
 )
 
 type sqliteRepo struct{ db *idb.DB }
@@ -49,16 +50,19 @@ func scanJob(s rowScanner) (*Job, error) {
 }
 
 func (r *sqliteRepo) Create(ctx context.Context, j *Job) error {
+	uid, _ := tenant.UserID(ctx)
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO jobs (id, titulo, empresa, descricao, url, localizacao, modelo, senioridade, resumo)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		string(j.ID), j.Titulo, nullable(j.Empresa), nullable(j.Descricao), nullable(j.URL),
+		`INSERT INTO jobs (id, user_id, titulo, empresa, descricao, url, localizacao, modelo, senioridade, resumo)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		string(j.ID), uid, j.Titulo, nullable(j.Empresa), nullable(j.Descricao), nullable(j.URL),
 		nullable(j.Localizacao), string(j.Modelo), nullable(j.Senioridade), nullable(j.Resumo))
 	return err
 }
 
 func (r *sqliteRepo) Get(ctx context.Context, id ID) (*Job, error) {
-	j, err := scanJob(r.db.QueryRowContext(ctx, `SELECT `+jobCols+` FROM jobs WHERE id = ?`, string(id)))
+	uid, _ := tenant.UserID(ctx)
+	j, err := scanJob(r.db.QueryRowContext(ctx,
+		`SELECT `+jobCols+` FROM jobs WHERE id = ? AND user_id = ?`, string(id), uid))
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +73,9 @@ func (r *sqliteRepo) Get(ctx context.Context, id ID) (*Job, error) {
 }
 
 func (r *sqliteRepo) List(ctx context.Context) ([]*Job, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+jobCols+` FROM jobs ORDER BY created_at DESC`)
+	uid, _ := tenant.UserID(ctx)
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT `+jobCols+` FROM jobs WHERE user_id = ? ORDER BY created_at DESC`, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -95,11 +101,12 @@ func (r *sqliteRepo) List(ctx context.Context) ([]*Job, error) {
 }
 
 func (r *sqliteRepo) Update(ctx context.Context, j *Job) error {
+	uid, _ := tenant.UserID(ctx)
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE jobs SET titulo = ?, empresa = ?, descricao = ?, url = ?, localizacao = ?,
-		 modelo = ?, senioridade = ?, resumo = ?, updated_at = ? WHERE id = ?`,
+		 modelo = ?, senioridade = ?, resumo = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
 		j.Titulo, nullable(j.Empresa), nullable(j.Descricao), nullable(j.URL), nullable(j.Localizacao),
-		string(j.Modelo), nullable(j.Senioridade), nullable(j.Resumo), idb.FormatTime(time.Now()), string(j.ID))
+		string(j.Modelo), nullable(j.Senioridade), nullable(j.Resumo), idb.FormatTime(time.Now()), string(j.ID), uid)
 	if err != nil {
 		return err
 	}
@@ -107,7 +114,8 @@ func (r *sqliteRepo) Update(ctx context.Context, j *Job) error {
 }
 
 func (r *sqliteRepo) Delete(ctx context.Context, id ID) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM jobs WHERE id = ?`, string(id))
+	uid, _ := tenant.UserID(ctx)
+	res, err := r.db.ExecContext(ctx, `DELETE FROM jobs WHERE id = ? AND user_id = ?`, string(id), uid)
 	if err != nil {
 		return err
 	}
@@ -115,8 +123,10 @@ func (r *sqliteRepo) Delete(ctx context.Context, id ID) error {
 }
 
 func (r *sqliteRepo) SetSkills(ctx context.Context, jobID ID, skillNames []string) error {
+	uid, _ := tenant.UserID(ctx)
 	return r.db.WithTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM job_skills WHERE job_id = ?`, string(jobID)); err != nil {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM job_skills WHERE job_id = ? AND user_id = ?`, string(jobID), uid); err != nil {
 			return err
 		}
 		for _, name := range skillNames {
@@ -125,7 +135,8 @@ func (r *sqliteRepo) SetSkills(ctx context.Context, jobID ID, skillNames []strin
 				continue
 			}
 			if _, err := tx.ExecContext(ctx,
-				`INSERT OR IGNORE INTO job_skills (job_id, skill) VALUES (?, ?)`, string(jobID), name); err != nil {
+				`INSERT OR IGNORE INTO job_skills (job_id, skill, user_id) VALUES (?, ?, ?)`,
+				string(jobID), name, uid); err != nil {
 				return err
 			}
 		}
@@ -134,8 +145,9 @@ func (r *sqliteRepo) SetSkills(ctx context.Context, jobID ID, skillNames []strin
 }
 
 func (r *sqliteRepo) listSkills(ctx context.Context, jobID ID) ([]string, error) {
+	uid, _ := tenant.UserID(ctx)
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT skill FROM job_skills WHERE job_id = ? ORDER BY skill`, string(jobID))
+		`SELECT skill FROM job_skills WHERE job_id = ? AND user_id = ? ORDER BY skill`, string(jobID), uid)
 	if err != nil {
 		return nil, err
 	}

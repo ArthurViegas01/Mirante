@@ -27,6 +27,15 @@ type Config struct {
 
 	SecretKey string
 
+	// SMTP (optional): when SMTPHost is set, the password-reset flow e-mails the
+	// link; otherwise it is logged to the server (dev).
+	SMTPHost         string
+	SMTPPort         int
+	SMTPUsername     string
+	SMTPPassword     string
+	SMTPFrom         string
+	PasswordResetTTL time.Duration
+
 	LLMProvider      string
 	LLMModel         string
 	LLMAPIKey        string
@@ -55,6 +64,10 @@ func Load() (Config, error) {
 		OwnerPassword:   env("OWNER_PASSWORD", ""),
 		OwnerHash:       env("OWNER_PASSWORD_HASH", ""),
 		SecretKey:       env("APP_SECRET_KEY", ""),
+		SMTPHost:        env("SMTP_HOST", ""),
+		SMTPUsername:    env("SMTP_USERNAME", ""),
+		SMTPPassword:    env("SMTP_PASSWORD", ""),
+		SMTPFrom:        env("SMTP_FROM", ""),
 		LLMProvider:     env("LLM_PROVIDER", "groq"),
 		LLMModel:        env("LLM_MODEL", ""),
 		OtelService:     env("OTEL_SERVICE_NAME", "mirante-api"),
@@ -96,6 +109,18 @@ func Load() (Config, error) {
 		return Config{}, errors.New("MONITOR_RETENTION_DAYS must be >= 1")
 	}
 	c.MonitorRetention = time.Duration(retentionDays) * 24 * time.Hour
+
+	smtpPort, err := atoi(env("SMTP_PORT", "587"))
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid SMTP_PORT: %w", err)
+	}
+	c.SMTPPort = smtpPort
+
+	resetTTL, err := time.ParseDuration(env("PASSWORD_RESET_TTL", "1h"))
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid PASSWORD_RESET_TTL: %w", err)
+	}
+	c.PasswordResetTTL = resetTTL
 
 	if c.IsProd() {
 		if c.SecretKey == "" {

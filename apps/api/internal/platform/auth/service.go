@@ -1,7 +1,7 @@
-// Package auth implements single-owner authentication: Argon2id passwords,
-// server-side opaque-token sessions, owner bootstrap, login rate-limiting, and
-// per-session CSRF tokens. The cookie holds only the random token; the database
-// stores its SHA-256.
+// Package auth implements account authentication: Argon2id passwords,
+// server-side opaque-token sessions, admin bootstrap, open signup with admin
+// activation, login rate-limiting, and per-session CSRF tokens. The cookie holds
+// only the random token; the database stores its SHA-256.
 package auth
 
 import (
@@ -20,31 +20,57 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrRateLimited        = errors.New("too many attempts")
 	ErrUnauthenticated    = errors.New("unauthenticated")
-	ErrSignupClosed       = errors.New("registration closed: owner already exists")
+	ErrPendingApproval    = errors.New("account pending admin approval")
+	ErrAccountNotActive   = errors.New("account is not active")
 )
 
 // Service ties the stores together with the login limiter.
 type Service struct {
-	users    *UserStore
-	sessions *SessionStore
-	limiter  *ratelimit.Limiter
-	ttl      time.Duration
+	db           *sql.DB
+	users        *UserStore
+	sessions     *SessionStore
+	resets       *PasswordResetStore
+	limiter      *ratelimit.Limiter
+	resetLimiter *ratelimit.Limiter
+	ttl          time.Duration
+
+	// Password-reset delivery (wired via WithMailer). A nil mailer logs the link.
+	mailer       Mailer
+	resetTTL     time.Duration
+	resetBaseURL string
 }
 
 // NewService builds the auth service. ttl is the absolute session lifetime.
 func NewService(db *sql.DB, ttl time.Duration) *Service {
 	return &Service{
-		users:    NewUserStore(db),
-		sessions: NewSessionStore(db),
-		limiter:  ratelimit.New(5, 15*time.Minute),
-		ttl:      ttl,
+		db:           db,
+		users:        NewUserStore(db),
+		sessions:     NewSessionStore(db),
+		resets:       NewPasswordResetStore(db),
+		limiter:      ratelimit.New(5, 15*time.Minute),
+		resetLimiter: ratelimit.New(3, 15*time.Minute),
+		ttl:          ttl,
+		resetTTL:     time.Hour, // default; overridden by WithMailer
 	}
 }
 
-// Bootstrap seeds the single owner from environment config if no user exists yet.
-// It is idempotent. With no OWNER_EMAIL it is a no-op: the owner is then claimed
-// through the first-run signup flow instead (see Signup). OWNER_EMAIL without a
-// password/hash is a real misconfiguration and still errors.
+// WithMailer wires optional e-mail delivery for password resets and returns the
+// service for chaining. baseURL is the web origin used to build the reset link;
+// resetTTL is how long a link stays valid (<=0 keeps the default). A nil mailer
+// is valid: the reset link is logged instead of e-mailed (dev).
+func (s *Service) WithMailer(m Mailer, baseURL string, resetTTL time.Duration) *Service {
+	s.mailer = m
+	s.resetBaseURL = strings.TrimRight(baseURL, "/")
+	if resetTTL > 0 {
+		s.resetTTL = resetTTL
+	}
+	return s
+}
+
+// Bootstrap seeds the admin from environment config if no user exists yet. It is
+// idempotent. With no OWNER_EMAIL it is a no-op: the admin is then claimed by the
+// first signup instead (see Signup). OWNER_EMAIL without a password/hash is a
+// real misconfiguration and still errors.
 func (s *Service) Bootstrap(ctx context.Context, email, password, passwordHash string) error {
 	n, err := s.users.Count(ctx)
 	if err != nil {
@@ -66,19 +92,22 @@ func (s *Service) Bootstrap(ctx context.Context, email, password, passwordHash s
 			return err
 		}
 	}
-	return s.users.Create(ctx, &User{ID: id.New(), Email: email, PasswordHash: hash})
+	return s.users.Create(ctx, &User{
+		ID: id.New(), Email: email, PasswordHash: hash, Role: RoleAdmin, Status: StatusActive,
+	})
 }
 
-// NeedsSetup reports whether the instance has no owner yet (so the UI should
-// route to the first-run signup instead of login).
+// NeedsSetup reports whether the instance has no account yet (so the UI can frame
+// the first signup as creating the admin).
 func (s *Service) NeedsSetup(ctx context.Context) (bool, error) {
 	n, err := s.users.Count(ctx)
 	return n == 0, err
 }
 
-// Signup claims the instance: it creates the single owner (only if none exists
-// yet) and immediately opens a session, returning it plus the cookie token. A
-// second attempt once the owner exists returns ErrSignupClosed.
+// Signup creates a self-service account. The first account becomes the admin and
+// is logged in immediately (session + token returned). Every later signup is
+// created 'pending' and returns ErrPendingApproval with no session — it cannot
+// log in until an admin activates it. A duplicate e-mail returns ErrEmailTaken.
 func (s *Service) Signup(ctx context.Context, email, password, name, userAgent, ip string) (*Session, string, error) {
 	email = strings.TrimSpace(email)
 	if email == "" || password == "" {
@@ -89,8 +118,12 @@ func (s *Service) Signup(ctx context.Context, email, password, name, userAgent, 
 		return nil, "", err
 	}
 	u := &User{ID: id.New(), Email: email, Name: strings.TrimSpace(name), PasswordHash: hash}
-	if err := s.users.CreateFirst(ctx, u); err != nil {
+	isFirst, err := s.users.CreateAccount(ctx, u)
+	if err != nil {
 		return nil, "", err
+	}
+	if !isFirst {
+		return nil, "", ErrPendingApproval
 	}
 	return s.createSession(ctx, u.ID, userAgent, ip)
 }
@@ -116,6 +149,11 @@ func (s *Service) Login(ctx context.Context, email, password, userAgent, ip stri
 		return nil, "", ErrInvalidCredentials
 	}
 	s.limiter.Reset(key)
+
+	// Only an activated account may log in (revealed only after a correct password).
+	if u.Status != StatusActive {
+		return nil, "", ErrAccountNotActive
+	}
 
 	return s.createSession(ctx, u.ID, userAgent, ip)
 }
@@ -173,7 +211,101 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	return s.sessions.Revoke(ctx, hashToken(token))
 }
 
-// SweepExpired deletes expired sessions; intended to run periodically.
+// SweepExpired deletes expired sessions and spent/expired reset tokens; intended
+// to run periodically. It returns the number of sessions removed.
 func (s *Service) SweepExpired(ctx context.Context) (int64, error) {
-	return s.sessions.DeleteExpired(ctx, time.Now().UTC())
+	now := time.Now().UTC()
+	n, err := s.sessions.DeleteExpired(ctx, now)
+	if err != nil {
+		return n, err
+	}
+	if _, err := s.resets.DeleteExpired(ctx, now); err != nil {
+		return n, err
+	}
+	return n, nil
+}
+
+// ListUsers returns every account (admin user management).
+func (s *Service) ListUsers(ctx context.Context) ([]*User, error) {
+	return s.users.List(ctx)
+}
+
+// ActivateUser marks a pending/disabled account active so it can log in.
+func (s *Service) ActivateUser(ctx context.Context, userID string) error {
+	return s.users.SetStatus(ctx, userID, StatusActive)
+}
+
+// DeactivateUser disables an account and revokes its live sessions.
+func (s *Service) DeactivateUser(ctx context.Context, userID string) error {
+	if err := s.users.SetStatus(ctx, userID, StatusDisabled); err != nil {
+		return err
+	}
+	return s.sessions.RevokeAllForUser(ctx, userID)
+}
+
+// AdminCreateUser creates an already-active account directly (admin), bypassing
+// the pending flow. role is coerced to "user" unless it is "admin".
+func (s *Service) AdminCreateUser(ctx context.Context, email, password, name, role string) (*User, error) {
+	email = strings.TrimSpace(email)
+	if email == "" || len(password) < 8 {
+		return nil, ErrInvalidCredentials
+	}
+	if role != RoleAdmin {
+		role = RoleUser
+	}
+	if _, err := s.users.GetByEmail(ctx, email); err == nil {
+		return nil, ErrEmailTaken
+	} else if !errors.Is(err, ErrUserNotFound) {
+		return nil, err
+	}
+	hash, err := HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+	u := &User{ID: id.New(), Email: email, Name: strings.TrimSpace(name), PasswordHash: hash, Role: role, Status: StatusActive}
+	if err := s.users.Create(ctx, u); err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+// DeleteUser removes an account and ALL of its data. libSQL runs with foreign
+// keys off, so the domain rows are purged explicitly (in one transaction) rather
+// than via cascade.
+func (s *Service) DeleteUser(ctx context.Context, userID string) error {
+	if err := s.purgeUserData(ctx, userID); err != nil {
+		return err
+	}
+	return s.users.Delete(ctx, userID)
+}
+
+// purgeUserData deletes every row owned by userID across all domains. Monitor
+// history (check_results/check_rollups) is keyed by service, so it is removed via
+// the user's services before the services themselves.
+func (s *Service) purgeUserData(ctx context.Context, userID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for _, q := range []string{
+		`DELETE FROM check_results WHERE service_id IN (SELECT id FROM services WHERE user_id = ?)`,
+		`DELETE FROM check_rollups WHERE service_id IN (SELECT id FROM services WHERE user_id = ?)`,
+	} {
+		if _, err := tx.ExecContext(ctx, q, userID); err != nil {
+			return err
+		}
+	}
+	for _, t := range []string{
+		"project_links", "project_tags", "tags", "task_tags", "tasks", "projects",
+		"subscriptions", "job_skills", "jobs", "applications",
+		"cv_skills", "cv_experience", "cv_education", "cv_profile",
+		"alerts", "events", "services", "llm_usage", "password_resets", "sessions",
+	} {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+t+` WHERE user_id = ?`, userID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

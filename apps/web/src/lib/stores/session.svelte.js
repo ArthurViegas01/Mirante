@@ -3,12 +3,17 @@
 class SessionStore {
 	user = $state(null);
 	csrf = $state('');
-	// True when the instance has no owner yet → route anonymous visitors to
-	// /signup instead of /login. Resolved from GET /api/auth/status on boot.
+	// True when the instance has no owner yet (resolved from GET /api/auth/status
+	// on boot). The signup screen uses it to show the form vs. a "closed" notice.
 	needsSetup = $state(false);
 
 	get authenticated() {
 		return this.user !== null;
+	}
+
+	// True when the logged-in account is the admin (gates the admin UI).
+	get isAdmin() {
+		return this.user?.role === 'admin';
 	}
 
 	// Friendly label for the owner: name, else the local-part of the e-mail.
