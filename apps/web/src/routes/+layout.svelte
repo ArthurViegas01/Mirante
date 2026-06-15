@@ -37,6 +37,7 @@
 	// the others are linked from it (signup, password recovery).
 	const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password'];
 	let isAuthRoute = $derived(AUTH_ROUTES.includes(path));
+	let isAdminRoute = $derived(path.startsWith('/admin'));
 	let authed = $derived(session.authenticated);
 
 	// Mobile drawer state + the current section label shown in the topbar.
@@ -93,6 +94,7 @@
 		if (!ready) return;
 		if (authed) {
 			if (isAuthRoute) goto('/');
+			else if (isAdminRoute && !session.isAdmin) goto('/'); // admin-only area
 		} else if (!isAuthRoute) {
 			goto('/login');
 		}

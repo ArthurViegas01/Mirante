@@ -12,6 +12,7 @@
 	let confirm = $state('');
 	let error = $state('');
 	let loading = $state(false);
+	let pending = $state(false);
 
 	let pwError = $derived(password.length > 0 && password.length < 8 ? 'Mínimo de 8 caracteres.' : '');
 	let confirmError = $derived(confirm.length > 0 && confirm !== password ? 'As senhas não conferem.' : '');
@@ -30,12 +31,18 @@
 		loading = true;
 		try {
 			const res = await api('/api/auth/signup', { method: 'POST', body: { email, password, name } });
-			setCsrf(res.csrf_token);
-			session.csrf = res.csrf_token;
-			session.needsSetup = false;
-			const me = await api('/api/auth/me');
-			session.user = me.user;
-			goto('/');
+			if (res.csrf_token) {
+				// First account becomes the admin and is logged in immediately.
+				setCsrf(res.csrf_token);
+				session.csrf = res.csrf_token;
+				session.needsSetup = false;
+				const me = await api('/api/auth/me');
+				session.user = me.user;
+				goto('/');
+			} else {
+				// Created, but awaiting admin activation before it can log in.
+				pending = true;
+			}
 		} catch (err) {
 			error = err.message || 'Falha ao criar a conta';
 		} finally {
@@ -46,12 +53,15 @@
 
 <section class="auth-card">
 	<div class="brand"><BrandMark size={26} /></div>
-	{#if session.needsSetup === false}
+	{#if pending}
 		<div class="intro">
-			<h1>Cadastro encerrado</h1>
-			<p class="lead">Já existe uma conta neste Mirante. Entre para acessar.</p>
+			<h1>Conta criada</h1>
+			<p class="lead">
+				Sua conta foi criada e está <strong>aguardando ativação</strong> pelo administrador. Você
+				poderá entrar assim que ela for aprovada.
+			</p>
 		</div>
-		<Button full onclick={() => goto('/login')}>Ir para o login</Button>
+		<a class="back" href="/login">← Voltar para o login</a>
 	{:else}
 		<div class="intro">
 			<h1>Criar conta</h1>
@@ -157,5 +167,15 @@
 	.aux a:hover {
 		color: var(--color-text);
 		text-decoration: underline;
+	}
+	.back {
+		align-self: center;
+		font-size: var(--text-sm);
+		color: var(--color-text-muted);
+		text-decoration: none;
+		transition: color var(--dur-fast) var(--ease-out);
+	}
+	.back:hover {
+		color: var(--color-text);
 	}
 </style>

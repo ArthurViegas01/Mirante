@@ -11,6 +11,11 @@ class SessionStore {
 		return this.user !== null;
 	}
 
+	// True when the logged-in account is the admin (gates the admin UI).
+	get isAdmin() {
+		return this.user?.role === 'admin';
+	}
+
 	// Friendly label for the owner: name, else the local-part of the e-mail.
 	get displayName() {
 		if (!this.user) return '';
