@@ -225,6 +225,42 @@ func TestSignupClaimsInstanceThenCloses(t *testing.T) {
 	require.Equal(t, http.StatusOK, loginStatus)
 }
 
+func TestForgotPasswordAlwaysOK(t *testing.T) {
+	base, client := setup(t) // owner seeded; serve() wires no mailer, so links are logged
+
+	// Known owner address.
+	require.Equal(t, http.StatusOK, statusOf(t, client,
+		newRequest(t, http.MethodPost, base+"/api/auth/forgot-password",
+			fmt.Sprintf(`{"email":%q}`, testEmail), "")))
+
+	// Unknown address — still 200, so the endpoint can't probe for the owner.
+	require.Equal(t, http.StatusOK, statusOf(t, client,
+		newRequest(t, http.MethodPost, base+"/api/auth/forgot-password",
+			`{"email":"stranger@example.com"}`, "")))
+}
+
+func TestForgotPasswordRejectsInvalidEmail(t *testing.T) {
+	base, client := setup(t)
+	require.Equal(t, http.StatusBadRequest, statusOf(t, client,
+		newRequest(t, http.MethodPost, base+"/api/auth/forgot-password",
+			`{"email":"not-an-email"}`, "")))
+}
+
+func TestForgotPasswordRejectsForeignOrigin(t *testing.T) {
+	base, client := setup(t)
+	req := newRequest(t, http.MethodPost, base+"/api/auth/forgot-password",
+		fmt.Sprintf(`{"email":%q}`, testEmail), "")
+	req.Header.Set("Origin", "http://evil.example")
+	require.Equal(t, http.StatusForbidden, statusOf(t, client, req))
+}
+
+func TestResetPasswordRejectsBadToken(t *testing.T) {
+	base, client := setup(t)
+	require.Equal(t, http.StatusBadRequest, statusOf(t, client,
+		newRequest(t, http.MethodPost, base+"/api/auth/reset-password",
+			`{"token":"bogus-token","password":"new-password-123"}`, "")))
+}
+
 func TestSignupRejectsShortPassword(t *testing.T) {
 	base, client := setupNoOwner(t)
 	status, _ := doSignup(t, client, base, testEmail, "short", "")

@@ -119,6 +119,15 @@ Em produção (sem `OWNER_EMAIL` no ambiente) a instância sobe **sem dono** e o
 cadastro fecha). Para experimentar o signup localmente, comente `OWNER_EMAIL`/
 `OWNER_PASSWORD` no `docker-compose.yml` e zere o volume (`docker compose down -v`).
 
+Esqueceu a senha? A tela **"Esqueci minha senha"** (`/forgot-password`) envia um
+link de redefinição por e-mail. No stack de dev (`docker compose`) o e-mail vai
+para o **Mailpit** — abra **http://localhost:8025** para lê-lo. Sem nenhum SMTP, o
+fluxo ainda funciona: o link é impresso no **log da API** (`reset_url`). Use o
+e-mail do **dono** (`OWNER_EMAIL`, ex.: `owner@example.com`) — endereços sem conta
+não disparam envio (proteção contra enumeração). O link é de uso único, expira em
+`PASSWORD_RESET_TTL` (1h) e, ao ser usado, encerra todas as sessões. Para entrega
+real (Gmail/provedor), troque os `SMTP_*` por credenciais de verdade.
+
 Sem Docker para o frontend:
 
 ```bash

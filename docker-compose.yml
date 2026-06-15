@@ -26,12 +26,27 @@ services:
       # compose substitutes it here. Empty = LLM features stay disabled.
       - LLM_PROVIDER=groq
       - GROQ_API_KEY=${GROQ_API_KEY:-}
+      # Password reset e-mail → Mailpit catcher in dev. Read captured messages at
+      # http://localhost:8025. For real delivery, point these at a provider
+      # (Gmail/SendGrid/…) via your .env and drop the mailpit service.
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+      - SMTP_FROM=Mirante <no-reply@mirante.local>
     ports:
       - "8080:8080"
     depends_on:
       - libsql
+      - mailpit
     # The API pings the DB on boot; retry until libsql is ready.
     restart: on-failure
+
+  # Dev-only SMTP catcher: the API "sends" reset e-mail here; you read it in the
+  # browser. Captures everything, delivers nothing — no credentials, no real mail.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025" # web inbox — open this to read captured e-mail
+      - "1025:1025" # SMTP endpoint the API delivers to
 
   web:
     image: node:24-alpine

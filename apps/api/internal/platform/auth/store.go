@@ -11,6 +11,7 @@ import (
 var (
 	ErrUserNotFound    = errors.New("user not found")
 	ErrSessionNotFound = errors.New("session not found")
+	ErrResetNotFound   = errors.New("password reset not found")
 )
 
 const tsLayout = "2006-01-02T15:04:05.000Z"
@@ -94,6 +95,14 @@ func (s *UserStore) CreateFirst(ctx context.Context, u *User) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+// UpdatePassword sets a new password hash for a user and bumps updated_at.
+func (s *UserStore) UpdatePassword(ctx context.Context, userID, hash string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`,
+		hash, formatTS(time.Now()), userID)
+	return err
 }
 
 // GetByEmail looks up a user by email (case-insensitive).
@@ -190,10 +199,90 @@ func (s *SessionStore) Revoke(ctx context.Context, tokenHash string) error {
 	return err
 }
 
+// RevokeAllForUser revokes every active session of a user. Called after a
+// password reset so a leaked or lingering cookie cannot outlive the credential.
+func (s *SessionStore) RevokeAllForUser(ctx context.Context, userID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`,
+		formatTS(time.Now()), userID)
+	return err
+}
+
 // DeleteExpired removes sessions past their expiry (GC).
 func (s *SessionStore) DeleteExpired(ctx context.Context, now time.Time) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
 		`DELETE FROM sessions WHERE expires_at < ?`, formatTS(now))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// PasswordReset is a single-use, time-boxed token that authorizes a password
+// change. The e-mail carries the plaintext token; only its hash is stored.
+type PasswordReset struct {
+	ID        string
+	UserID    string
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+}
+
+// PasswordResetStore persists password-reset tokens.
+type PasswordResetStore struct{ db *sql.DB }
+
+// NewPasswordResetStore builds a PasswordResetStore.
+func NewPasswordResetStore(db *sql.DB) *PasswordResetStore { return &PasswordResetStore{db: db} }
+
+// Create inserts a reset token, storing only its hash.
+func (s *PasswordResetStore) Create(ctx context.Context, pr *PasswordReset, tokenHash string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO password_resets (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)`,
+		pr.ID, pr.UserID, tokenHash, formatTS(pr.ExpiresAt))
+	return err
+}
+
+// GetByToken returns the reset for a token hash.
+func (s *PasswordResetStore) GetByToken(ctx context.Context, tokenHash string) (*PasswordReset, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, user_id, expires_at, used_at FROM password_resets WHERE token_hash = ?`, tokenHash)
+
+	var (
+		pr        PasswordReset
+		expiresAt string
+		usedAt    sql.NullString
+	)
+	if err := row.Scan(&pr.ID, &pr.UserID, &expiresAt, &usedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrResetNotFound
+		}
+		return nil, err
+	}
+	pr.ExpiresAt = parseTS(expiresAt)
+	if usedAt.Valid {
+		t := parseTS(usedAt.String)
+		pr.UsedAt = &t
+	}
+	return &pr, nil
+}
+
+// MarkUsed stamps a reset as redeemed so it cannot be replayed.
+func (s *PasswordResetStore) MarkUsed(ctx context.Context, id string, at time.Time) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE password_resets SET used_at = ? WHERE id = ?`, formatTS(at), id)
+	return err
+}
+
+// DeleteForUser removes a user's outstanding resets (called before issuing a
+// new one so only the latest link is live).
+func (s *PasswordResetStore) DeleteForUser(ctx context.Context, userID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM password_resets WHERE user_id = ?`, userID)
+	return err
+}
+
+// DeleteExpired removes used or expired resets (GC).
+func (s *PasswordResetStore) DeleteExpired(ctx context.Context, now time.Time) (int64, error) {
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM password_resets WHERE expires_at < ? OR used_at IS NOT NULL`, formatTS(now))
 	if err != nil {
 		return 0, err
 	}

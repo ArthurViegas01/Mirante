@@ -10,6 +10,19 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### Adicionado
+- **Recuperação de senha por e-mail.** Novo fluxo "Esqueci minha senha" para o
+  dono único: `POST /api/auth/forgot-password` emite um token de uso único (hash
+  SHA-256 no banco, validade de 1h, tabela `password_resets` na migração 0015) e
+  entrega o link; `POST /api/auth/reset-password` define a nova senha e **revoga
+  todas as sessões**. Telas `/forgot-password` e `/reset-password` (cards de
+  marca, validação inline) e link na tela de login; o guard do layout libera as
+  rotas de recuperação para visitantes deslogados. Envio por SMTP
+  (`internal/platform/mailer`, STARTTLS/465, auth PLAIN opcional); sem `SMTP_HOST`
+  o link é registrado no log da API (`reset_url`) para uso em dev. O pedido
+  responde sempre `200` para não revelar se um e-mail tem conta, com rate limit
+  por endereço. O stack de dev (`docker compose`) inclui um **Mailpit**
+  (`localhost:8025`) como caixa de captura. Novas envs:
+  `SMTP_HOST/PORT/USERNAME/PASSWORD/FROM`, `PASSWORD_RESET_TTL`.
 - **Dashboard inicial (`/`).** Painel que reúne as quatro áreas: KPIs (projetos
   ativos, serviços no ar, tarefas abertas/atrasadas, custo mensal, pipeline),
   painel "ao vivo" do Monitor, foco do dia (tarefas a vencer) e snapshot de
@@ -32,8 +45,12 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 
 ### Alterado
 - **Login e signup redesenhados** como cards de marca (lockup, validação inline,
-  reveal de senha, autocomplete correto; signup com enquadramento de "primeiro
-  acesso").
+  reveal de senha, autocomplete correto). O **login é a porta de entrada única**:
+  todo acesso anônimo cai nele, com botão fixo **Criar conta** e link de
+  recuperação de senha; o signup virou um "Criar conta" simples (sem o
+  enquadramento de "primeiro acesso") e mostra um aviso de **cadastro encerrado**
+  quando já existe uma conta (o back-end segue single-owner). Deixou de haver
+  redirecionamento automático para `/signup`.
 - **Páginas refinadas** (projetos, tarefas, custos, vagas, cv, candidaturas) e os
   componentes `ProjectStacks`/`ProjectCosts`: skeletons no lugar de "Carregando…",
   empty states com CTA, toasts em todas as mutações (inclusive ações de IA) e

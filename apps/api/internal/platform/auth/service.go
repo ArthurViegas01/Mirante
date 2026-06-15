@@ -25,20 +25,43 @@ var (
 
 // Service ties the stores together with the login limiter.
 type Service struct {
-	users    *UserStore
-	sessions *SessionStore
-	limiter  *ratelimit.Limiter
-	ttl      time.Duration
+	users        *UserStore
+	sessions     *SessionStore
+	resets       *PasswordResetStore
+	limiter      *ratelimit.Limiter
+	resetLimiter *ratelimit.Limiter
+	ttl          time.Duration
+
+	// Password-reset delivery (wired via WithMailer). A nil mailer logs the link.
+	mailer       Mailer
+	resetTTL     time.Duration
+	resetBaseURL string
 }
 
 // NewService builds the auth service. ttl is the absolute session lifetime.
 func NewService(db *sql.DB, ttl time.Duration) *Service {
 	return &Service{
-		users:    NewUserStore(db),
-		sessions: NewSessionStore(db),
-		limiter:  ratelimit.New(5, 15*time.Minute),
-		ttl:      ttl,
+		users:        NewUserStore(db),
+		sessions:     NewSessionStore(db),
+		resets:       NewPasswordResetStore(db),
+		limiter:      ratelimit.New(5, 15*time.Minute),
+		resetLimiter: ratelimit.New(3, 15*time.Minute),
+		ttl:          ttl,
+		resetTTL:     time.Hour, // default; overridden by WithMailer
 	}
+}
+
+// WithMailer wires optional e-mail delivery for password resets and returns the
+// service for chaining. baseURL is the web origin used to build the reset link;
+// resetTTL is how long a link stays valid (<=0 keeps the default). A nil mailer
+// is valid: the reset link is logged instead of e-mailed (dev).
+func (s *Service) WithMailer(m Mailer, baseURL string, resetTTL time.Duration) *Service {
+	s.mailer = m
+	s.resetBaseURL = strings.TrimRight(baseURL, "/")
+	if resetTTL > 0 {
+		s.resetTTL = resetTTL
+	}
+	return s
 }
 
 // Bootstrap seeds the single owner from environment config if no user exists yet.
@@ -173,7 +196,16 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	return s.sessions.Revoke(ctx, hashToken(token))
 }
 
-// SweepExpired deletes expired sessions; intended to run periodically.
+// SweepExpired deletes expired sessions and spent/expired reset tokens; intended
+// to run periodically. It returns the number of sessions removed.
 func (s *Service) SweepExpired(ctx context.Context) (int64, error) {
-	return s.sessions.DeleteExpired(ctx, time.Now().UTC())
+	now := time.Now().UTC()
+	n, err := s.sessions.DeleteExpired(ctx, now)
+	if err != nil {
+		return n, err
+	}
+	if _, err := s.resets.DeleteExpired(ctx, now); err != nil {
+		return n, err
+	}
+	return n, nil
 }

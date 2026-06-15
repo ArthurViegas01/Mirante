@@ -36,6 +36,8 @@ func (h *AuthHandlers) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/auth/status", http.HandlerFunc(h.Status))
 	mux.Handle("POST /api/auth/signup", http.HandlerFunc(h.Signup))
 	mux.Handle("POST /api/auth/login", http.HandlerFunc(h.Login))
+	mux.Handle("POST /api/auth/forgot-password", http.HandlerFunc(h.ForgotPassword))
+	mux.Handle("POST /api/auth/reset-password", http.HandlerFunc(h.ResetPassword))
 	mux.Handle("GET /api/auth/me", h.RequireAuth(http.HandlerFunc(h.Me)))
 	mux.Handle("POST /api/auth/logout", h.Protect(http.HandlerFunc(h.Logout)))
 }
@@ -56,6 +58,15 @@ type signupRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=8"`
 	Name     string `json:"name" validate:"omitempty,max=80"`
+}
+
+type forgotPasswordRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+type resetPasswordRequest struct {
+	Token    string `json:"token" validate:"required"`
+	Password string `json:"password" validate:"required,min=8"`
 }
 
 // Status reports whether the instance still needs its first-run owner setup. It
@@ -136,6 +147,65 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, h.sessionCookie(token, sess.ExpiresAt))
 	writeJSON(w, http.StatusOK, map[string]any{"csrf_token": sess.CSRFToken})
+}
+
+// ForgotPassword issues a password-reset link to the owner's e-mail. It always
+// responds 200 (whether or not the address has an account) so it can't be used
+// to probe for the owner's e-mail.
+func (h *AuthHandlers) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	if !originAllowed(r, h.cfg.AllowedOrigin) {
+		writeError(w, http.StatusForbidden, "forbidden_origin", "origin not allowed")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxLoginBody)
+	var req forgotPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	if err := validate.Struct(req); err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", "a valid email is required")
+		return
+	}
+
+	if err := h.svc.RequestPasswordReset(r.Context(), req.Email); err != nil {
+		// Genuine internal failure only — account existence is never revealed.
+		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// ResetPassword consumes a reset token and sets a new password. On success all
+// sessions were revoked, so the owner is sent back to login.
+func (h *AuthHandlers) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	if !originAllowed(r, h.cfg.AllowedOrigin) {
+		writeError(w, http.StatusForbidden, "forbidden_origin", "origin not allowed")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxLoginBody)
+	var req resetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	if err := validate.Struct(req); err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error",
+			"a reset token and a password of at least 8 characters are required")
+		return
+	}
+
+	err := h.svc.ResetPassword(r.Context(), req.Token, req.Password)
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	case errors.Is(err, auth.ErrResetTokenInvalid):
+		writeError(w, http.StatusBadRequest, "invalid_token", "this reset link is invalid or has expired")
+	case errors.Is(err, auth.ErrInvalidCredentials):
+		writeError(w, http.StatusBadRequest, "validation_error", "a password of at least 8 characters is required")
+	default:
+		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+	}
 }
 
 // Logout revokes the session and clears the cookie.

@@ -1,17 +1,19 @@
 <script>
+	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
 	import BrandMark from '$lib/components/BrandMark.svelte';
-	import { api, setCsrf } from '$lib/api.js';
-	import { session } from '$lib/stores/session.svelte.js';
+	import { api } from '$lib/api.js';
 
-	let name = $state('');
-	let email = $state('');
+	// The token rides in the link we e-mailed: /reset-password?token=…
+	let token = $derived($page.url.searchParams.get('token') ?? '');
+
 	let password = $state('');
 	let confirm = $state('');
 	let error = $state('');
 	let loading = $state(false);
+	let done = $state(false);
 
 	let pwError = $derived(password.length > 0 && password.length < 8 ? 'Mínimo de 8 caracteres.' : '');
 	let confirmError = $derived(confirm.length > 0 && confirm !== password ? 'As senhas não conferem.' : '');
@@ -29,15 +31,10 @@
 		}
 		loading = true;
 		try {
-			const res = await api('/api/auth/signup', { method: 'POST', body: { email, password, name } });
-			setCsrf(res.csrf_token);
-			session.csrf = res.csrf_token;
-			session.needsSetup = false;
-			const me = await api('/api/auth/me');
-			session.user = me.user;
-			goto('/');
+			await api('/api/auth/reset-password', { method: 'POST', body: { token, password } });
+			done = true;
 		} catch (err) {
-			error = err.message || 'Falha ao criar a conta';
+			error = err.message || 'Não foi possível redefinir a senha';
 		} finally {
 			loading = false;
 		}
@@ -46,30 +43,27 @@
 
 <section class="auth-card">
 	<div class="brand"><BrandMark size={26} /></div>
-	{#if session.needsSetup === false}
+	{#if done}
 		<div class="intro">
-			<h1>Cadastro encerrado</h1>
-			<p class="lead">Já existe uma conta neste Mirante. Entre para acessar.</p>
+			<h1>Senha redefinida</h1>
+			<p class="lead">Sua senha foi atualizada e suas sessões foram encerradas. Entre com a nova senha.</p>
 		</div>
 		<Button full onclick={() => goto('/login')}>Ir para o login</Button>
+	{:else if !token}
+		<div class="intro">
+			<h1>Link inválido</h1>
+			<p class="lead">Este link de redefinição está incompleto ou expirou. Solicite um novo.</p>
+		</div>
+		<a class="back" href="/forgot-password">Solicitar novo link</a>
 	{:else}
 		<div class="intro">
-			<h1>Criar conta</h1>
-			<p class="lead">Crie sua conta para acessar o Mirante.</p>
+			<p class="eyebrow">Recuperação de acesso</p>
+			<h1>Crie uma nova senha</h1>
+			<p class="lead">Escolha uma nova senha para sua conta.</p>
 		</div>
 		<form onsubmit={submit}>
-			<Input label="Nome" name="name" autocomplete="name" bind:value={name} placeholder="Seu nome (opcional)" />
 			<Input
-				label="E-mail"
-				type="email"
-				name="email"
-				autocomplete="username"
-				bind:value={email}
-				placeholder="voce@example.com"
-				required
-			/>
-			<Input
-				label="Senha"
+				label="Nova senha"
 				type="password"
 				name="password"
 				autocomplete="new-password"
@@ -88,9 +82,9 @@
 				required
 			/>
 			{#if error}<p class="alert" role="alert">{error}</p>{/if}
-			<Button type="submit" full disabled={loading}>{loading ? 'Criando…' : 'Criar conta'}</Button>
+			<Button type="submit" full disabled={loading}>{loading ? 'Salvando…' : 'Redefinir senha'}</Button>
 		</form>
-		<p class="aux">Já tem uma conta? <a href="/login">Entrar</a></p>
+		<a class="back" href="/login">← Voltar para o login</a>
 	{/if}
 </section>
 
@@ -115,6 +109,9 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-1);
+	}
+	.eyebrow {
+		margin: 0 0 var(--space-1);
 	}
 	h1 {
 		font-size: var(--text-xl);
@@ -143,19 +140,14 @@
 		border: var(--border-width-1) solid color-mix(in srgb, var(--color-danger) 30%, transparent);
 		font-size: var(--text-sm);
 	}
-	.aux {
-		margin: 0;
-		text-align: center;
+	.back {
+		align-self: center;
 		font-size: var(--text-sm);
-		color: var(--color-text-muted);
-	}
-	.aux a {
 		color: var(--color-text-muted);
 		text-decoration: none;
 		transition: color var(--dur-fast) var(--ease-out);
 	}
-	.aux a:hover {
+	.back:hover {
 		color: var(--color-text);
-		text-decoration: underline;
 	}
 </style>
