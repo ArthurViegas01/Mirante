@@ -27,8 +27,11 @@ type Config struct {
 
 	SecretKey string
 
-	// SMTP (optional): when SMTPHost is set, the password-reset flow e-mails the
-	// link; otherwise it is logged to the server (dev).
+	// E-mail (optional). The password-reset flow uses Resend (HTTP API) when
+	// ResendAPIKey is set, else SMTP when SMTPHost is set, else logs the link.
+	// MailFrom is the sender for whichever transport is active.
+	ResendAPIKey     string
+	MailFrom         string
 	SMTPHost         string
 	SMTPPort         int
 	SMTPUsername     string
@@ -64,6 +67,7 @@ func Load() (Config, error) {
 		OwnerPassword:   env("OWNER_PASSWORD", ""),
 		OwnerHash:       env("OWNER_PASSWORD_HASH", ""),
 		SecretKey:       env("APP_SECRET_KEY", ""),
+		ResendAPIKey:    env("RESEND_API_KEY", ""),
 		SMTPHost:        env("SMTP_HOST", ""),
 		SMTPUsername:    env("SMTP_USERNAME", ""),
 		SMTPPassword:    env("SMTP_PASSWORD", ""),
@@ -115,6 +119,9 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("invalid SMTP_PORT: %w", err)
 	}
 	c.SMTPPort = smtpPort
+
+	// Canonical sender; MAIL_FROM wins, else the legacy SMTP_FROM.
+	c.MailFrom = env("MAIL_FROM", c.SMTPFrom)
 
 	resetTTL, err := time.ParseDuration(env("PASSWORD_RESET_TTL", "1h"))
 	if err != nil {

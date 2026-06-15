@@ -71,10 +71,8 @@ func run() error {
 	authSvc := auth.NewService(database.DB, cfg.SessionTTL)
 	resetMailer, mailerOK := buildMailer(cfg, log)
 	authSvc.WithMailer(resetMailer, cfg.WebOrigin, cfg.PasswordResetTTL)
-	if mailerOK {
-		log.Info("password reset e-mail enabled", "smtp_host", cfg.SMTPHost)
-	} else {
-		log.Info("password reset e-mail disabled (no SMTP) — reset links are logged to the server")
+	if !mailerOK {
+		log.Info("password reset e-mail disabled — reset links are logged to the server")
 	}
 	if err := authSvc.Bootstrap(ctx, cfg.OwnerEmail, cfg.OwnerPassword, cfg.OwnerHash); err != nil {
 		return err
@@ -252,24 +250,35 @@ func run() error {
 	}
 }
 
-// buildMailer constructs the SMTP mailer when SMTP_HOST is configured. A missing
-// host (the dev default) returns (nil, false), so the reset flow logs links to
-// the server instead of e-mailing them. An invalid config disables e-mail too,
-// rather than blocking boot.
+// buildMailer picks the e-mail transport: the Resend HTTP API when
+// RESEND_API_KEY is set (preferred for production deliverability), else SMTP when
+// SMTP_HOST is set (Mailpit in dev), else none — in which case the reset flow
+// logs the link to the server. An invalid config disables e-mail rather than
+// blocking boot.
 func buildMailer(cfg config.Config, log *slog.Logger) (auth.Mailer, bool) {
-	if cfg.SMTPHost == "" {
-		return nil, false
+	if cfg.ResendAPIKey != "" {
+		m, err := mailer.NewResend(cfg.ResendAPIKey, cfg.MailFrom)
+		if err != nil {
+			log.Warn("invalid Resend config — password reset e-mail disabled", "err", err)
+			return nil, false
+		}
+		log.Info("password reset e-mail enabled", "provider", "resend", "from", cfg.MailFrom)
+		return m, true
 	}
-	m, err := mailer.NewSMTP(mailer.Config{
-		Host:     cfg.SMTPHost,
-		Port:     cfg.SMTPPort,
-		Username: cfg.SMTPUsername,
-		Password: cfg.SMTPPassword,
-		From:     cfg.SMTPFrom,
-	})
-	if err != nil {
-		log.Warn("invalid SMTP config — password reset e-mail disabled", "err", err)
-		return nil, false
+	if cfg.SMTPHost != "" {
+		m, err := mailer.NewSMTP(mailer.Config{
+			Host:     cfg.SMTPHost,
+			Port:     cfg.SMTPPort,
+			Username: cfg.SMTPUsername,
+			Password: cfg.SMTPPassword,
+			From:     cfg.MailFrom,
+		})
+		if err != nil {
+			log.Warn("invalid SMTP config — password reset e-mail disabled", "err", err)
+			return nil, false
+		}
+		log.Info("password reset e-mail enabled", "provider", "smtp", "smtp_host", cfg.SMTPHost)
+		return m, true
 	}
-	return m, true
+	return nil, false
 }
