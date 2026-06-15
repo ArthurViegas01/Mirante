@@ -26,12 +26,19 @@ services:
       # compose substitutes it here. Empty = LLM features stay disabled.
       - LLM_PROVIDER=groq
       - GROQ_API_KEY=${GROQ_API_KEY:-}
-      # Password reset e-mail → Mailpit catcher in dev. Read captured messages at
-      # http://localhost:8025. For real delivery, point these at a provider
-      # (Gmail/SendGrid/…) via your .env and drop the mailpit service.
-      - SMTP_HOST=mailpit
-      - SMTP_PORT=1025
-      - SMTP_FROM=Mirante <no-reply@mirante.local>
+      # Password reset e-mail. Defaults to the Mailpit catcher (read it at
+      # http://localhost:8025). For REAL delivery (e.g. Gmail), set SMTP_* in a
+      # root .env — it overrides these defaults without versioning the secret:
+      #   SMTP_HOST=smtp.gmail.com
+      #   SMTP_PORT=587
+      #   SMTP_USERNAME=voce@gmail.com
+      #   SMTP_PASSWORD=<app password do Gmail, 16 chars>
+      #   SMTP_FROM=Mirante <voce@gmail.com>
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-Mirante <no-reply@mirante.local>}
     ports:
       - "8080:8080"
     depends_on:
