@@ -14,7 +14,8 @@ deploy Fly). Ver [CHANGELOG.md](CHANGELOG.md).
 
 ## O que é
 
-Mirante é um app **single-user** organizado em quatro áreas, tendo **Projeto**
+Mirante é um app **multiusuário** — cada pessoa tem o seu Mirante privado, no
+mesmo deploy de instância única — organizado em quatro áreas, tendo **Projeto**
 como espinha de tudo:
 
 | Área | O que faz |
@@ -114,17 +115,19 @@ docker compose up --build       # sobe libSQL (sqld) + API + web (dev)
 # login de dev: owner@example.com / change-me-dev  (definido no compose)
 ```
 
-Em produção (sem `OWNER_EMAIL` no ambiente) a instância sobe **sem dono** e o
-**primeiro acesso pela UI** cria a conta do dono (signup, single-user; depois o
-cadastro fecha). Para experimentar o signup localmente, comente `OWNER_EMAIL`/
-`OWNER_PASSWORD` no `docker-compose.yml` e zere o volume (`docker compose down -v`).
+Em produção (sem `OWNER_EMAIL`) a instância sobe **sem conta**: o **primeiro
+cadastro pela UI** vira o **admin** e já entra. Cadastros seguintes nascem
+**pendentes** e só logam depois que o admin os ativa em **Usuários**
+(`/admin/usuarios`). Para testar o primeiro acesso localmente, comente
+`OWNER_EMAIL`/`OWNER_PASSWORD` no `docker-compose.yml` e zere o volume
+(`docker compose down -v`).
 
 Esqueceu a senha? A tela **"Esqueci minha senha"** (`/forgot-password`) envia um
 link de redefinição por e-mail. No stack de dev (`docker compose`) o e-mail vai
 para o **Mailpit** — abra **http://localhost:8025** para lê-lo. Sem nenhum SMTP, o
 fluxo ainda funciona: o link é impresso no **log da API** (`reset_url`). Use o
-e-mail do **dono** (`OWNER_EMAIL`, ex.: `owner@example.com`) — endereços sem conta
-não disparam envio (proteção contra enumeração). O link é de uso único, expira em
+e-mail de uma **conta existente** (no dev, o admin `owner@example.com`) — endereços
+sem conta não disparam envio (proteção contra enumeração). O link é de uso único, expira em
 `PASSWORD_RESET_TTL` (1h) e, ao ser usado, encerra todas as sessões. Para entrega
 real (Gmail/provedor), troque os `SMTP_*` por credenciais de verdade.
 
@@ -163,9 +166,10 @@ fly secrets set DATABASE_URL=libsql://<db>.turso.io DATABASE_AUTH_TOKEN=... \
 fly deploy && fly scale count 1
 ```
 
-O dono é criado no **primeiro acesso (signup)** — sem `OWNER_*` em produção. O
-frontend (SvelteKit, `adapter-node`) é publicado à parte (Fly, Vercel, etc.),
-apontando `API_URL`/`WEB_ORIGIN` para a API.
+O **admin** é criado no **primeiro cadastro (signup)** — sem `OWNER_*` em
+produção; cadastros seguintes ficam pendentes até o admin ativá-los. O frontend
+(SvelteKit, `adapter-node`) é publicado à parte (Fly, Vercel, etc.), apontando
+`API_URL`/`WEB_ORIGIN` para a API.
 
 ## Segurança
 

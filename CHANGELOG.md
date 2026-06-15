@@ -10,6 +10,24 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### Adicionado
+- **Multiusuário.** O Mirante deixa de ser single-user: cada usuário tem seu
+  próprio Mirante privado, no mesmo deploy de instância única ([ADR-0008](docs/adr/0008-multiusuario.md)).
+  - **Isolamento por usuário.** Toda tabela de domínio ganha `user_id` (migrações
+    0016/0017); todo repositório filtra pelo dono, lido do contexto da requisição
+    (`internal/platform/tenant`, injetado pelo middleware de auth). Projetos,
+    tarefas, custos, vagas, CV, candidaturas e monitor passam a ser por-usuário;
+    codinome de projeto, tags e skills de CV viram únicos por usuário; o CV deixa
+    de ser singleton. O monitor mantém o scheduler/engine em nível de sistema,
+    carimba alertas/eventos com o dono do serviço e faz fan-out de SSE por
+    usuário. Testes de isolamento por domínio garantem que A não vê dados de B.
+  - **Cadastro com aprovação do admin.** Qualquer um se cadastra, mas a conta
+    nasce `pending` e só loga após ativação (1ª conta = admin, entra direto;
+    demais ficam pendentes, login `403`, até o admin ativar). E-mail duplicado
+    `409`.
+  - **Admin.** Papéis `admin`/`user`; tela `/admin/usuarios` e API
+    `/api/admin/users` (só admin) para listar, criar, ativar, desativar e excluir
+    contas — excluir um usuário apaga todos os seus dados. Novas colunas em
+    `users`: `role`, `status`.
 - **Recuperação de senha por e-mail.** Novo fluxo "Esqueci minha senha" para o
   dono único: `POST /api/auth/forgot-password` emite um token de uso único (hash
   SHA-256 no banco, validade de 1h, tabela `password_resets` na migração 0015) e
