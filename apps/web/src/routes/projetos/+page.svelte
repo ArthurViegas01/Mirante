@@ -3,9 +3,13 @@
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import Textarea from '$lib/components/Textarea.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { api } from '$lib/api.js';
+	import { toasts } from '$lib/stores/toast.svelte.js';
 	import { STATUS, STATUS_OPTIONS, VIS_OPTIONS } from '$lib/projectStatus.js';
 
 	let projects = $state([]);
@@ -31,6 +35,7 @@
 			projects = res.projects;
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		} finally {
 			loading = false;
 		}
@@ -60,9 +65,11 @@
 			});
 			showForm = false;
 			resetForm();
+			toasts.success('Projeto criado');
 			await load();
 		} catch (e) {
 			formError = e.message;
+			toasts.error(e.message);
 		} finally {
 			saving = false;
 		}
@@ -87,7 +94,7 @@
 			<Input label="Repo" bind:value={repo} placeholder="https://github.com/…" />
 			<Input label="Tags (vírgula)" bind:value={tagsText} placeholder="Go, SvelteKit" />
 		</div>
-		<Input label="Descrição" bind:value={descricao} />
+		<Textarea label="Descrição" bind:value={descricao} rows={3} placeholder="O que é este projeto?" />
 		{#if formError}<p class="error">{formError}</p>{/if}
 		<div class="actions">
 			<Button type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Criar projeto'}</Button>
@@ -96,11 +103,42 @@
 {/if}
 
 {#if loading}
-	<p class="muted">Carregando…</p>
+	<div class="table-wrap" aria-hidden="true">
+		<table>
+			<thead>
+				<tr>
+					<th>Projeto</th>
+					<th>Status</th>
+					<th>Stack</th>
+					<th>Visibilidade</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each Array(5) as _, i (i)}
+					<tr class="sk-row">
+						<td class="name">
+							<Skeleton w="55%" h="14px" />
+							<Skeleton w="35%" h="11px" radius="var(--radius-sm)" block />
+						</td>
+						<td><Skeleton w="68px" h="20px" radius="var(--radius-full)" /></td>
+						<td><Skeleton w="80%" h="12px" /></td>
+						<td><Skeleton w="50%" h="12px" /></td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
 {:else if error}
 	<p class="error">{error}</p>
 {:else if projects.length === 0}
-	<div class="panel empty">Nenhum projeto ainda. Crie o primeiro.</div>
+	<EmptyState
+		title="Nenhum projeto ainda"
+		description="Crie o primeiro projeto para começar a acompanhar status, links e tarefas."
+	>
+		{#snippet children()}
+			<Button onclick={() => (showForm = true)}>Novo projeto</Button>
+		{/snippet}
+	</EmptyState>
 {:else}
 	<div class="table-wrap">
 		<table>
@@ -159,9 +197,6 @@
 		color: var(--color-text);
 		margin: 0;
 	}
-	.muted {
-		color: var(--color-text-secondary);
-	}
 	.error {
 		color: var(--color-danger-text);
 		font-size: var(--text-sm);
@@ -188,10 +223,13 @@
 		display: flex;
 		justify-content: flex-end;
 	}
-	.empty {
-		padding: var(--space-8);
-		text-align: center;
-		color: var(--color-text-muted);
+	.sk-row td {
+		cursor: default;
+	}
+	.sk-row .name {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
 	}
 	.table-wrap {
 		background-color: var(--color-surface);

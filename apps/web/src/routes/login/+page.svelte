@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import BrandMark from '$lib/components/BrandMark.svelte';
 	import { api, setCsrf } from '$lib/api.js';
 	import { session } from '$lib/stores/session.svelte.js';
 
@@ -20,7 +21,7 @@
 			session.csrf = res.csrf_token;
 			const me = await api('/api/auth/me');
 			session.user = me.user;
-			goto('/projetos');
+			goto('/');
 		} catch (err) {
 			error = err.message || 'Falha no login';
 		} finally {
@@ -29,53 +30,81 @@
 	}
 </script>
 
-<section class="login">
-	<p class="eyebrow">Mirante</p>
-	<h1>Entrar</h1>
+<section class="auth-card">
+	<div class="brand"><BrandMark size={26} /></div>
+	<div class="intro">
+		<h1>Bem-vindo de volta</h1>
+		<p class="lead">Entre para abrir sua central de comando.</p>
+	</div>
 	<form onsubmit={submit}>
-		<Input label="E-mail" type="email" bind:value={email} placeholder="owner@example.com" required />
-		<Input label="Senha" type="password" bind:value={password} required />
-		{#if error}<p class="error" role="alert">{error}</p>{/if}
-		<Button type="submit" disabled={loading}>{loading ? 'Entrando…' : 'Entrar'}</Button>
+		<Input
+			label="E-mail"
+			type="email"
+			name="email"
+			autocomplete="username"
+			bind:value={email}
+			placeholder="voce@example.com"
+			required
+		/>
+		<Input
+			label="Senha"
+			type="password"
+			name="password"
+			autocomplete="current-password"
+			bind:value={password}
+			required
+		/>
+		{#if error}<p class="alert" role="alert">{error}</p>{/if}
+		<Button type="submit" full disabled={loading}>{loading ? 'Entrando…' : 'Entrar'}</Button>
 	</form>
-	<p class="footer">by Lumni</p>
 </section>
 
 <style>
-	.login {
-		max-width: 360px;
+	.auth-card {
+		width: 100%;
+		max-width: 400px;
 		margin-inline: auto;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-6);
+		padding: var(--space-8);
+		background-color: var(--color-surface);
+		border: var(--border-width-1) solid var(--color-border);
+		border-radius: var(--radius-2xl);
+		box-shadow: var(--shadow-lg);
+		color: var(--color-text);
+		--mark-fill: var(--color-primary);
+		--word-size: 22px;
 	}
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		letter-spacing: var(--tracking-eyebrow);
-		text-transform: uppercase;
-		color: var(--color-text-muted);
-		margin: 0 0 var(--space-2);
+	.intro {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
 	}
 	h1 {
-		font-size: var(--text-2xl);
+		font-size: var(--text-xl);
 		font-weight: var(--weight-medium);
 		letter-spacing: var(--tracking-snug);
 		color: var(--color-text);
-		margin: 0 0 var(--space-6);
+		margin: 0;
+	}
+	.lead {
+		font-size: var(--text-sm);
+		color: var(--color-text-muted);
+		margin: 0;
 	}
 	form {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
 	}
-	.error {
-		color: var(--color-danger-text);
-		font-size: var(--text-sm);
+	.alert {
 		margin: 0;
-	}
-	.footer {
-		margin-top: var(--space-8);
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		color: var(--color-text-muted);
-		text-align: center;
+		padding: 10px 12px;
+		border-radius: var(--radius-md);
+		background-color: var(--color-danger-bg);
+		color: var(--color-danger-text);
+		border: var(--border-width-1) solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+		font-size: var(--text-sm);
 	}
 </style>

@@ -1,8 +1,32 @@
 <script>
 	import { page } from '$app/stores';
+	import { afterNavigate } from '$app/navigation';
 	import { monitor } from '$lib/stores/monitor.svelte.js';
+	import BrandMark from '$lib/components/BrandMark.svelte';
+	import UserMenu from '$lib/components/UserMenu.svelte';
+
+	// On mobile the sidebar is an off-canvas drawer controlled by the layout.
+	let { open = $bindable(false) } = $props();
+
+	// Close after any navigation (drawer use) and on Escape.
+	afterNavigate(() => {
+		open = false;
+	});
+	$effect(() => {
+		if (!open) return;
+		function onKey(e) {
+			if (e.key === 'Escape') open = false;
+		}
+		document.addEventListener('keydown', onKey);
+		return () => document.removeEventListener('keydown', onKey);
+	});
 
 	const items = [
+		{
+			href: '/',
+			label: 'Início',
+			icon: 'm3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10'
+		},
 		{
 			href: '/projetos',
 			label: 'Projetos',
@@ -40,28 +64,32 @@
 	}
 </script>
 
-<nav class="sidebar" aria-label="Navegação principal">
+<div class="scrim" class:show={open} onclick={() => (open = false)} aria-hidden="true"></div>
+
+<nav class="sidebar" class:open aria-label="Navegação principal">
 	<div class="brand">
-		<svg class="mark" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-			<path
-				d="M12 1.5 14.2 9.8 22.5 12 14.2 14.2 12 22.5 9.8 14.2 1.5 12 9.8 9.8Z"
-				fill="var(--glow)"
-			/>
-		</svg>
-		<span class="wordmark">mirante</span>
-		<span class="tag">MIRANTE</span>
+		<BrandMark tag="MIRANTE" />
 		<span
 			class="live"
 			class:on={monitor.connected}
 			title={monitor.connected ? 'Ao vivo' : 'Offline'}
 			aria-label="Indicador ao vivo"
 		></span>
+		<button class="close-drawer" onclick={() => (open = false)} aria-label="Fechar menu">
+			<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M18 6 6 18M6 6l12 12" />
+			</svg>
+		</button>
 	</div>
 
 	<ul class="nav">
 		{#each items as item (item.href)}
 			<li>
-				<a href={item.href} class:active={active($page.url.pathname, item.href)}>
+				<a
+					href={item.href}
+					class:active={active($page.url.pathname, item.href)}
+					aria-current={active($page.url.pathname, item.href) ? 'page' : undefined}
+				>
 					<svg
 						viewBox="0 0 24 24"
 						width="16"
@@ -82,7 +110,7 @@
 	</ul>
 
 	<div class="footer">
-		<span class="org">by Lumni</span>
+		<UserMenu />
 	</div>
 </nav>
 
@@ -104,20 +132,10 @@
 		align-items: center;
 		gap: 7px;
 		padding: 4px 6px 16px;
-	}
-	.wordmark {
-		font-family: var(--font-serif);
-		font-style: italic;
-		font-size: 16px;
-		font-weight: 400;
 		color: #ffffff;
-		letter-spacing: -0.01em;
-	}
-	.tag {
-		font-family: var(--font-mono);
-		font-size: 9.5px;
-		letter-spacing: var(--tracking-eyebrow);
-		color: rgba(255, 255, 255, 0.4);
+		--mark-fill: var(--glow);
+		--word-size: 16px;
+		--tag-color: rgba(255, 255, 255, 0.4);
 	}
 	.live {
 		width: 7px;
@@ -187,12 +205,75 @@
 
 	.footer {
 		border-top: var(--border-width-1) solid rgba(255, 255, 255, 0.06);
-		padding-top: 12px;
+		padding-top: 10px;
 		margin-top: 12px;
 	}
-	.org {
-		font-family: var(--font-mono);
-		font-size: 11px;
-		color: rgba(255, 255, 255, 0.4);
+
+	/* Mobile drawer affordances (hidden on desktop). */
+	.close-drawer {
+		display: none;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		margin-left: 4px;
+		border: none;
+		border-radius: var(--radius-md);
+		background: transparent;
+		color: rgba(255, 255, 255, 0.6);
+		cursor: pointer;
+	}
+	.close-drawer:hover {
+		color: #ffffff;
+		background-color: rgba(255, 255, 255, 0.06);
+	}
+	.close-drawer:focus-visible {
+		outline: none;
+		box-shadow: var(--shadow-focus);
+	}
+	.scrim {
+		display: none;
+	}
+
+	@media (max-width: 720px) {
+		.sidebar {
+			position: fixed;
+			top: 0;
+			left: 0;
+			bottom: 0;
+			width: min(82vw, 300px);
+			z-index: 120;
+			transform: translateX(-100%);
+			transition: transform var(--dur-base) var(--ease-out);
+			border-right: var(--border-width-1) solid rgba(255, 255, 255, 0.08);
+		}
+		.sidebar.open {
+			transform: translateX(0);
+			box-shadow: var(--shadow-xl);
+		}
+		.scrim {
+			display: block;
+			position: fixed;
+			inset: 0;
+			z-index: 110;
+			background-color: color-mix(in srgb, var(--ink-950) 55%, transparent);
+			opacity: 0;
+			pointer-events: none;
+			transition: opacity var(--dur-base) var(--ease-out);
+		}
+		.scrim.show {
+			opacity: 1;
+			pointer-events: auto;
+		}
+		.close-drawer {
+			display: inline-flex;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.sidebar,
+		.scrim {
+			transition: none;
+		}
 	}
 </style>

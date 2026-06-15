@@ -2,7 +2,11 @@
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
 	import Select from '$lib/components/Select.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { api } from '$lib/api.js';
+	import { toasts } from '$lib/stores/toast.svelte.js';
+	import { confirm } from '$lib/stores/confirm.svelte.js';
 	import {
 		formatMoney,
 		toCents,
@@ -105,10 +109,12 @@
 				await api('/api/subscriptions', { method: 'POST', body: { project_id: projectId, ...body } });
 			}
 			showForm = false;
+			toasts.success(editingId ? 'Assinatura atualizada' : 'Assinatura criada');
 			resetForm();
 			await load();
 		} catch (e) {
 			formError = e.message;
+			toasts.error(e.message);
 		} finally {
 			saving = false;
 		}
@@ -117,19 +123,31 @@
 	async function toggleAtivo(s) {
 		try {
 			await api(`/api/subscriptions/${s.id}`, { method: 'PATCH', body: { ativo: !s.ativo } });
+			toasts.success(s.ativo ? `"${s.nome}" pausada` : `"${s.nome}" retomada`);
 			await load();
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 
 	async function remove(s) {
-		if (!confirm(`Excluir a assinatura "${s.nome}"?`)) return;
+		if (
+			!(await confirm.ask({
+				title: 'Excluir assinatura?',
+				message: `A assinatura "${s.nome}" será removida em definitivo.`,
+				confirmLabel: 'Excluir',
+				danger: true
+			}))
+		)
+			return;
 		try {
 			await api(`/api/subscriptions/${s.id}`, { method: 'DELETE' });
+			toasts.success('Assinatura excluída');
 			await load();
 		} catch (e) {
 			error = e.message;
+			toasts.error(e.message);
 		}
 	}
 </script>
@@ -163,11 +181,27 @@
 	{/if}
 
 	{#if loading}
-		<p class="muted">Carregando…</p>
+		<ul class="subs sk-list">
+			{#each [0, 1, 2] as i (i)}
+				<li class="sk-row">
+					<Skeleton w="35%" h="14px" />
+					<Skeleton w="80px" h="13px" />
+					<Skeleton w="90px" h="12px" />
+				</li>
+			{/each}
+		</ul>
 	{:else if error}
 		<p class="error">{error}</p>
 	{:else if subscriptions.length === 0}
-		<p class="muted">Nenhuma assinatura. Registre os custos recorrentes (hospedagem, banco, domínio…).</p>
+		<EmptyState
+			compact
+			title="Nenhuma assinatura"
+			description="Registre os custos recorrentes (hospedagem, banco, domínio)."
+		>
+			{#snippet children()}
+				<Button size="sm" onclick={openAdd}>Nova assinatura</Button>
+			{/snippet}
+		</EmptyState>
 	{:else}
 		<ul class="subs">
 			{#each subscriptions as s (s.id)}
@@ -242,6 +276,9 @@
 		flex-direction: column;
 		gap: var(--space-2);
 	}
+	.sk-row {
+		justify-content: space-between;
+	}
 	.subs li {
 		display: flex;
 		align-items: center;
@@ -297,10 +334,6 @@
 	}
 	.link-btn.danger:hover {
 		color: var(--color-danger-text);
-	}
-	.muted {
-		color: var(--color-text-secondary);
-		font-size: var(--text-sm);
 	}
 	.error {
 		color: var(--color-danger-text);
