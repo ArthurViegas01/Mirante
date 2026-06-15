@@ -7,8 +7,9 @@
 
 **Status:** `v0.7.0` — F0–F5 entregues: Projetos, Monitor (no projeto, com rollups/
 pruning), Tarefas, Stacks & Custos, Vagas/CV/CRM com IA (Groq), webhooks de alerta e
-observabilidade OTLP — além de prontidão de produção (signup do dono, banco Turso,
-deploy Fly). Ver [CHANGELOG.md](CHANGELOG.md).
+observabilidade OTLP — além de prontidão de produção (banco Turso, deploy Fly).
+**Não lançado:** **multiusuário** (isolamento por usuário + cadastro com aprovação
+do admin) e recuperação de senha por e-mail. Ver [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -27,6 +28,15 @@ como espinha de tudo:
 
 O **Início** (`/`) é o painel que reúne tudo: KPIs das quatro áreas, status ao
 vivo do monitor, foco do dia (tarefas a vencer) e o snapshot de carreira.
+
+### Contas & acesso
+
+Mirante é **multiusuário por isolamento**: cada conta tem o seu próprio Mirante —
+ninguém vê os dados de ninguém. O **cadastro é aberto**, mas toda conta nova nasce
+**pendente** e só consegue entrar depois que o **admin** a ativa. A primeira conta
+da instância (ou a semeada por `OWNER_*`) é o admin. A gestão de contas (ativar,
+desativar, criar, excluir) fica em **Usuários** (`/admin/usuarios`), visível apenas
+para o admin. Ver [ADR-0008](docs/adr/0008-multiusuario.md).
 
 ## Stack
 
@@ -61,9 +71,10 @@ A camada de UX é construída sobre primitivos reutilizáveis em
 Textarea, Select, Modal, ConfirmHost, Toaster, EmptyState, Skeleton, StatCard,
 StatusBadge, BrandMark, UserMenu) e stores em runes (`toast`, `confirm`,
 `session`, `monitor`). O app abre num **dashboard** (`/`) que reúne as quatro
-áreas, com identidade do dono e logout no menu da sidebar, navegação em drawer no
-mobile, feedback por toasts, confirmações em diálogo e transições de página via
-View Transitions API. Tudo respeita `prefers-reduced-motion`.
+áreas, com identidade do usuário e logout no menu da sidebar (mais o atalho
+**Usuários** quando o usuário é admin), navegação em drawer no mobile, feedback por
+toasts, confirmações em diálogo e transições de página via View Transitions API.
+Tudo respeita `prefers-reduced-motion`.
 
 ## Estrutura do monorepo
 
@@ -77,7 +88,7 @@ mirante/
 │  └─ web/                 # SvelteKit + Svelte 5
 ├─ docs/
 │  ├─ design/              # Lumni Design System (fonte de verdade)
-│  └─ adr/                 # ADR-0001..0004
+│  └─ adr/                 # ADR-0001..0008
 ├─ docker-compose.yml · CHANGELOG.md · README.md
 ```
 
@@ -88,7 +99,7 @@ mirante/
 
 ## Decisões de arquitetura (ADRs)
 
-> A serem materializadas em `docs/adr/` na F0.
+Registros completos em [`docs/adr/`](docs/adr/) (ADR-0001..0008). Destaques:
 
 - **ADR-0001 — Fronteiras do monólito modular.** Pacotes de domínio não importam
   uns aos outros; cross-domain via interfaces (ports) + IDs tipados. Shared
@@ -101,6 +112,9 @@ mirante/
 - **ADR-0004 — Abstração de LLM.** Provider trocável por env (não failover
   automático entre providers); saída estruturada via JSON Schema; rate limit por
   rota; ledger de uso.
+- **ADR-0008 — Multiusuário.** Isolamento por `user_id` (id do dono no contexto da
+  requisição, escopo em todos os repositórios); cadastro aberto com **aprovação do
+  admin**; RBAC mínimo (admin/user). Supera o adiamento de RBAC do ADR-0007.
 
 ## Desenvolvimento
 
@@ -112,7 +126,7 @@ o frontend fora de container. Go **não** é necessário no host — os alvos Go
 docker compose up --build       # sobe libSQL (sqld) + API + web (dev)
 # web:  http://localhost:5173
 # api:  http://localhost:8080  (healthz, /api/auth/*)
-# login de dev: owner@example.com / change-me-dev  (definido no compose)
+# login de dev (admin): owner@example.com / change-me-dev  (definido no compose)
 ```
 
 Em produção (sem `OWNER_EMAIL`) a instância sobe **sem conta**: o **primeiro
