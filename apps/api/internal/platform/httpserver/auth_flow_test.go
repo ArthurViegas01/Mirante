@@ -199,7 +199,7 @@ func TestLoginRejectsForeignOrigin(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, statusOf(t, client, req))
 }
 
-func TestSignupClaimsInstanceThenCloses(t *testing.T) {
+func TestSignupFirstIsAdminThenPending(t *testing.T) {
 	base, client := setupNoOwner(t)
 
 	// Fresh instance needs setup, and a protected route is closed.
@@ -207,21 +207,25 @@ func TestSignupClaimsInstanceThenCloses(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized,
 		statusOf(t, client, newRequest(t, http.MethodGet, base+"/api/auth/me", "", "")))
 
-	// Signup claims the owner and logs in (cookie set, CSRF returned).
+	// First signup claims the admin and logs in (cookie set, CSRF returned).
 	status, csrf := doSignup(t, client, base, testEmail, testPass, "Owner")
 	require.Equal(t, http.StatusCreated, status)
 	require.NotEmpty(t, csrf)
 	require.Equal(t, http.StatusOK,
 		statusOf(t, client, newRequest(t, http.MethodGet, base+"/api/auth/me", "", "")))
-
-	// Setup is now done and registration is closed for a new visitor.
 	require.False(t, needsSetup(t, client, base))
-	fresh := newClient(t)
-	closed, _ := doSignup(t, fresh, base, "intruder@example.com", "another-pass", "")
-	require.Equal(t, http.StatusForbidden, closed)
 
-	// The owner can log in with the credentials chosen at signup.
-	loginStatus, _ := doLogin(t, fresh, base, testEmail, testPass)
+	// Registration stays open, but a later signup is created pending (202, no
+	// session) and cannot log in until an admin activates it.
+	fresh := newClient(t)
+	pending, pendCSRF := doSignup(t, fresh, base, "newuser@example.com", "another-pass", "")
+	require.Equal(t, http.StatusAccepted, pending)
+	require.Empty(t, pendCSRF)
+	notYet, _ := doLogin(t, newClient(t), base, "newuser@example.com", "another-pass")
+	require.Equal(t, http.StatusForbidden, notYet)
+
+	// The admin can log in with the credentials chosen at signup.
+	loginStatus, _ := doLogin(t, newClient(t), base, testEmail, testPass)
 	require.Equal(t, http.StatusOK, loginStatus)
 }
 
@@ -268,9 +272,57 @@ func TestSignupRejectsShortPassword(t *testing.T) {
 	require.True(t, needsSetup(t, client, base)) // nothing was created
 }
 
-func TestSignupClosedWhenOwnerBootstrapped(t *testing.T) {
-	base, client := setup(t) // owner seeded from env-style bootstrap
+func TestSignupWhenAdminExistsIsPending(t *testing.T) {
+	base, client := setup(t) // admin seeded from env-style bootstrap
 	require.False(t, needsSetup(t, client, base))
 	status, _ := doSignup(t, client, base, "someone@example.com", "a-valid-pass", "")
-	require.Equal(t, http.StatusForbidden, status)
+	require.Equal(t, http.StatusAccepted, status) // created, awaiting activation
+
+	// A duplicate e-mail is rejected.
+	dup, _ := doSignup(t, newClient(t), base, testEmail, "whatever-pass", "")
+	require.Equal(t, http.StatusConflict, dup)
+}
+
+func TestAdminActivationFlow(t *testing.T) {
+	base, admin := setup(t) // testEmail is the seeded admin (active)
+	_, csrf := doLogin(t, admin, base, testEmail, testPass)
+	require.NotEmpty(t, csrf)
+
+	// A stranger signs up → pending, cannot log in.
+	st, _ := doSignup(t, newClient(t), base, "pend@example.com", "pending-pass", "Pend")
+	require.Equal(t, http.StatusAccepted, st)
+	blocked, _ := doLogin(t, newClient(t), base, "pend@example.com", "pending-pass")
+	require.Equal(t, http.StatusForbidden, blocked)
+
+	// Admin finds the pending account and activates it.
+	resp, err := admin.Do(newRequest(t, http.MethodGet, base+"/api/admin/users", "", ""))
+	require.NoError(t, err)
+	var lb struct {
+		Users []struct{ ID, Email, Role, Status string } `json:"users"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&lb))
+	_ = resp.Body.Close()
+	var pendID string
+	for _, u := range lb.Users {
+		if u.Email == "pend@example.com" {
+			require.Equal(t, "user", u.Role)
+			require.Equal(t, "pending", u.Status)
+			pendID = u.ID
+		}
+	}
+	require.NotEmpty(t, pendID)
+
+	require.Equal(t, http.StatusOK, statusOf(t, admin,
+		newRequest(t, http.MethodPost, base+"/api/admin/users/"+pendID+"/activate", "", csrf)))
+
+	// Now the user can log in — and, as a regular user, is denied the admin API.
+	pendClient := newClient(t)
+	ok, _ := doLogin(t, pendClient, base, "pend@example.com", "pending-pass")
+	require.Equal(t, http.StatusOK, ok)
+	require.Equal(t, http.StatusForbidden,
+		statusOf(t, pendClient, newRequest(t, http.MethodGet, base+"/api/admin/users", "", "")))
+
+	// An anonymous caller is unauthenticated, not just forbidden.
+	require.Equal(t, http.StatusUnauthorized,
+		statusOf(t, newClient(t), newRequest(t, http.MethodGet, base+"/api/admin/users", "", "")))
 }

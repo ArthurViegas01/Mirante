@@ -40,6 +40,13 @@ func (h *AuthHandlers) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/auth/reset-password", http.HandlerFunc(h.ResetPassword))
 	mux.Handle("GET /api/auth/me", h.RequireAuth(http.HandlerFunc(h.Me)))
 	mux.Handle("POST /api/auth/logout", h.Protect(http.HandlerFunc(h.Logout)))
+
+	// Admin-only user management.
+	mux.Handle("GET /api/admin/users", h.RequireAdmin(http.HandlerFunc(h.AdminListUsers)))
+	mux.Handle("POST /api/admin/users", h.RequireAdmin(http.HandlerFunc(h.AdminCreateUser)))
+	mux.Handle("POST /api/admin/users/{id}/activate", h.RequireAdmin(http.HandlerFunc(h.AdminActivateUser)))
+	mux.Handle("POST /api/admin/users/{id}/deactivate", h.RequireAdmin(http.HandlerFunc(h.AdminDeactivateUser)))
+	mux.Handle("DELETE /api/admin/users/{id}", h.RequireAdmin(http.HandlerFunc(h.AdminDeleteUser)))
 }
 
 // Protect wraps a handler with session auth and CSRF enforcement. CSRF only
@@ -47,6 +54,19 @@ func (h *AuthHandlers) RegisterRoutes(mux *http.ServeMux) {
 // modules wrap their whole sub-router with this.
 func (h *AuthHandlers) Protect(next http.Handler) http.Handler {
 	return h.RequireAuth(h.CSRF(next))
+}
+
+// RequireAdmin is Protect plus an admin-role gate: session auth, then a 403 for
+// non-admins, then CSRF on unsafe methods.
+func (h *AuthHandlers) RequireAdmin(next http.Handler) http.Handler {
+	gated := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if u, ok := UserFrom(r.Context()); !ok || u.Role != auth.RoleAdmin {
+			writeError(w, http.StatusForbidden, "forbidden", "admin access required")
+			return
+		}
+		h.CSRF(next).ServeHTTP(w, r)
+	})
+	return h.RequireAuth(gated)
 }
 
 type loginRequest struct {
@@ -101,8 +121,11 @@ func (h *AuthHandlers) Signup(w http.ResponseWriter, r *http.Request) {
 	sess, token, err := h.svc.Signup(r.Context(), req.Email, req.Password, req.Name, r.UserAgent(), clientIP(r))
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrSignupClosed):
-			writeError(w, http.StatusForbidden, "signup_closed", "registration is closed")
+		case errors.Is(err, auth.ErrPendingApproval):
+			// Account created, but it must be activated by an admin before login.
+			writeJSON(w, http.StatusAccepted, map[string]any{"status": "pending"})
+		case errors.Is(err, auth.ErrEmailTaken):
+			writeError(w, http.StatusConflict, "email_taken", "this email is already registered")
 		case errors.Is(err, auth.ErrInvalidCredentials):
 			writeError(w, http.StatusBadRequest, "validation_error", "email and password are required")
 		default:
@@ -111,6 +134,7 @@ func (h *AuthHandlers) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// First account (admin) is logged in immediately.
 	http.SetCookie(w, h.sessionCookie(token, sess.ExpiresAt))
 	writeJSON(w, http.StatusCreated, map[string]any{"csrf_token": sess.CSRFToken})
 }
@@ -137,6 +161,8 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, auth.ErrRateLimited):
 			writeError(w, http.StatusTooManyRequests, "rate_limited", "too many attempts, try again later")
+		case errors.Is(err, auth.ErrAccountNotActive):
+			writeError(w, http.StatusForbidden, "account_not_active", "your account is awaiting activation")
 		case errors.Is(err, auth.ErrInvalidCredentials):
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		default:
@@ -229,7 +255,9 @@ func (h *AuthHandlers) Me(w http.ResponseWriter, r *http.Request) {
 		csrf = sess.CSRFToken
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"user":       map[string]string{"id": u.ID, "email": u.Email, "name": u.Name},
+		"user": map[string]string{
+			"id": u.ID, "email": u.Email, "name": u.Name, "role": u.Role, "status": u.Status,
+		},
 		"csrf_token": csrf,
 	})
 }
