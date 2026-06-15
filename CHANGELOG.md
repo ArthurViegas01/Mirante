@@ -9,6 +9,46 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 
 ## [Não lançado]
 
+### Adicionado
+- **Dashboard inicial (`/`).** Painel que reúne as quatro áreas: KPIs (projetos
+  ativos, serviços no ar, tarefas abertas/atrasadas, custo mensal, pipeline),
+  painel "ao vivo" do Monitor, foco do dia (tarefas a vencer) e snapshot de
+  carreira. O pós-login passa a abrir aqui (antes caía em `/projetos`) e a sidebar
+  ganhou o item **Início**. Dados via endpoints existentes (sem mudança de API).
+- **Logout e identidade do dono na UI.** Novo `UserMenu` no rodapé da sidebar
+  (avatar gradiente Beam→Glow, nome, e-mail) com ação de **Sair**
+  (`POST /api/auth/logout`, que já existia na API mas não tinha interface). Fecha
+  ao clicar fora e no Escape.
+- **Primitivos de UX reutilizáveis** em `apps/web/src/lib/components/`: toasts
+  (`Toaster` + store `toast`), diálogos (`Modal`, `ConfirmHost` + `confirm.ask()`
+  no lugar do `confirm()` nativo), `EmptyState`, `Skeleton`, `StatCard`,
+  `Textarea`, `BrandMark`. `Button` ganhou variante `danger` e `full`; `Input`
+  ganhou estado de erro, hint, autocomplete e botão de mostrar/ocultar senha.
+- **Navegação mobile.** A sidebar vira drawer (hambúrguer na topbar, backdrop,
+  fecha ao navegar/Escape); a topbar mostra o título da seção. `aria-current` no
+  item ativo e `aria-expanded` nos controles expansíveis.
+- **Motion.** Transições de página via View Transitions API e entradas sutis no
+  dashboard, todas sob `prefers-reduced-motion`.
+
+### Alterado
+- **Login e signup redesenhados** como cards de marca (lockup, validação inline,
+  reveal de senha, autocomplete correto; signup com enquadramento de "primeiro
+  acesso").
+- **Páginas refinadas** (projetos, tarefas, custos, vagas, cv, candidaturas) e os
+  componentes `ProjectStacks`/`ProjectCosts`: skeletons no lugar de "Carregando…",
+  empty states com CTA, toasts em todas as mutações (inclusive ações de IA) e
+  confirmação em diálogo nas ações destrutivas (incluindo a remoção de link, que
+  antes não pedia confirmação). Styleguide atualizado como referência viva dos
+  novos componentes.
+
+### Corrigido
+- **As fontes não carregavam.** Os `.woff2` de Figtree, Instrument Serif e Geist
+  Mono não estavam versionados, então todo o `@font-face` caía nas fontes do
+  sistema e a tipografia do design system não era aplicada no app no ar. Os
+  arquivos foram embarcados em `apps/web/static/fonts/` (`font-display: swap`).
+- **Sessão expirada (401) tratada no cliente.** Um 401 em rota protegida agora
+  limpa a sessão e redireciona ao login, em vez de falhar em silêncio.
+
 ### A fazer
 - Deploy real (Fly + Turso) e front hospedado; multi-usuário/RBAC quando houver
   necessidade (ADR-0007). Multi-instância (Redis + leader election) segue adiada

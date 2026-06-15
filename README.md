@@ -24,6 +24,9 @@ como espinha de tudo:
 | **Tarefas** | Atividades vinculáveis a projetos e a vagas. |
 | **Vagas & CV** | Aderência (determinística + LLM), CV mestre adaptável, e-mail/carta e CRM de candidaturas. |
 
+O **Início** (`/`) é o painel que reúne tudo: KPIs das quatro áreas, status ao
+vivo do monitor, foco do dia (tarefas a vencer) e o snapshot de carreira.
+
 ## Stack
 
 Tecnologias deliberadamente novas (regra de aprendizado do projeto).
@@ -45,11 +48,21 @@ Tecnologias deliberadamente novas (regra de aprendizado do projeto).
 ## Design
 
 Fonte de verdade: [docs/design/lumni-design-system.md](docs/design/lumni-design-system.md).
-Tokens em [apps/web/src/app.css](apps/web/src/app.css) — role tokens (light em
-`:root`, dark em `[data-theme="dark"]`), focus ring de 3px, clamp de
-`prefers-reduced-motion`, fontes Figtree / Instrument Serif / Geist Mono.
+Tokens em [apps/web/src/app.css](apps/web/src/app.css): role tokens (light em
+`:root`, dark em `[data-theme="dark"]`), focus ring de 3px e clamp de
+`prefers-reduced-motion`. As fontes (Figtree, Instrument Serif, Geist Mono) são
+self-hosted em `apps/web/static/fonts/` (woff2, `font-display: swap`).
 Mirante não diverge a paleta da Lumni; a única assinatura é **Glow** (`#5EEAD4`)
 nos elementos "ao vivo" (`--color-live*`), e a tag mono da sidebar vira `MIRANTE`.
+
+A camada de UX é construída sobre primitivos reutilizáveis em
+[apps/web/src/lib/components/](apps/web/src/lib/components/) (Button, Input,
+Textarea, Select, Modal, ConfirmHost, Toaster, EmptyState, Skeleton, StatCard,
+StatusBadge, BrandMark, UserMenu) e stores em runes (`toast`, `confirm`,
+`session`, `monitor`). O app abre num **dashboard** (`/`) que reúne as quatro
+áreas, com identidade do dono e logout no menu da sidebar, navegação em drawer no
+mobile, feedback por toasts, confirmações em diálogo e transições de página via
+View Transitions API. Tudo respeita `prefers-reduced-motion`.
 
 ## Estrutura do monorepo
 
