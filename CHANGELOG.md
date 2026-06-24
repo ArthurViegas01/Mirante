@@ -86,6 +86,19 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   novos componentes.
 
 ### Corrigido
+- **Login caía de forma intermitente quando o Turso oscilava.** Com a borda do
+  Turso reciclando o stream da conexão ou respondendo `502 connect to upstream`,
+  a conexão única e perene da API "envenenava" e toda query — inclusive o login —
+  passava a falhar com `stream is closed: bad connection` até a conexão expirar
+  (o scheduler do monitor registrava o mesmo erro a cada 15s). No caminho remoto
+  (libSQL/Turso) a API agora usa um pool pequeno com `SetConnMaxLifetime` (5min),
+  reciclando os streams antes de o Turso derrubá-los; o SQLite local segue
+  single-writer. Erros transitórios de conectividade são classificados e repetidos
+  com backoff curto (`internal/platform/db`: `Retry`/`IsTransient`) no login
+  (leituras + criação de sessão), na autenticação por sessão e no `reconcile` do
+  monitor. `WithTx` repete apenas falhas **antes** do commit — um commit ambíguo
+  não é repetido, para não duplicar escritas não idempotentes (ex.: contadores de
+  rollup do compactador).
 - **As fontes não carregavam.** Os `.woff2` de Figtree, Instrument Serif e Geist
   Mono não estavam versionados, então todo o `@font-face` caía nas fontes do
   sistema e a tipografia do design system não era aplicada no app no ar. Os
