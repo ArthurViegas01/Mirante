@@ -10,6 +10,20 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### Adicionado
+- **Captação de propostas freelance (99Freelas).** Nova área **Propostas**
+  (`/propostas`): um poller IMAP lê os e-mails de novos projetos do 99Freelas
+  (read-only, `EXAMINE` + `BODY.PEEK` — nunca marca como lido nem apaga), parseia
+  cada projeto (título, categoria, nível, prazo, nº de propostas, skills e os links
+  *Ver projeto* / *Enviar proposta*) e o estaciona numa fila de triagem **ranqueada
+  por score** (aderência de skills + concorrência + frescor). Duplicados são
+  deduplicados pelo id do projeto; a fila permite **descartar**. Novo domínio
+  `internal/intake` (staging isolado por usuário, migração 0018), poller atrás de uma
+  interface `MessageSource` testável, itens atribuídos ao dono da caixa (e-mail =
+  `INTAKE_IMAP_USERNAME`), com fallback no admin. Configuração por env
+  `INTAKE_IMAP_*` / `INTAKE_POLL_INTERVAL` / `INTAKE_MIN_SCORE` — **dormente sem
+  credenciais**. O catálogo de skills ganhou termos de freela (Shopify, WordPress,
+  Pentaho, etc.). Geração da proposta e *promover → vaga + candidatura* ficam para
+  uma próxima fase.
 - **Importar projeto do GitHub.** No formulário de novo projeto, cole o link do
   repositório e clique em **Buscar do GitHub** para pré-preencher nome, codinome,
   descrição, URL do repo e tags (linguagem principal + topics); repositório

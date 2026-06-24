@@ -37,6 +37,17 @@ services:
       - SMTP_USERNAME=${SMTP_USERNAME:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - SMTP_FROM=${SMTP_FROM:-Mirante <no-reply@mirante.local>}
+      # Intake do 99Freelas (poller IMAP). Defina INTAKE_IMAP_USERNAME e
+      # INTAKE_IMAP_PASSWORD (senha de app do Gmail) num .env na raiz — sem isso o
+      # poller fica dormente. Tudo vem do .env; nenhum segredo é versionado.
+      - INTAKE_IMAP_HOST=${INTAKE_IMAP_HOST:-imap.gmail.com}
+      - INTAKE_IMAP_PORT=${INTAKE_IMAP_PORT:-993}
+      - INTAKE_IMAP_USERNAME=${INTAKE_IMAP_USERNAME:-}
+      - INTAKE_IMAP_PASSWORD=${INTAKE_IMAP_PASSWORD:-}
+      - INTAKE_IMAP_MAILBOX=${INTAKE_IMAP_MAILBOX:-INBOX}
+      - INTAKE_IMAP_FROM=${INTAKE_IMAP_FROM:-99freelas.com.br}
+      - INTAKE_POLL_INTERVAL=${INTAKE_POLL_INTERVAL:-15m}
+      - INTAKE_MIN_SCORE=${INTAKE_MIN_SCORE:-60}
     ports:
       - "8080:8080"
     depends_on:

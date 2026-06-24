@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 
 	"github.com/lumni/mirante/internal/applications"
 	"github.com/lumni/mirante/internal/cv"
+	"github.com/lumni/mirante/internal/intake"
 	"github.com/lumni/mirante/internal/jobs"
 	"github.com/lumni/mirante/internal/llm"
 	"github.com/lumni/mirante/internal/monitor"
@@ -132,6 +134,58 @@ func run() error {
 
 	applicationsSvc := applications.NewService(applications.NewSQLiteRepo(database))
 	applications.RegisterRoutes(mux, authH.Protect, applicationsSvc)
+
+	// Intake: the freelance-opportunity funnel (99Freelas). The service + routes are
+	// always mounted (so the funnel UI works); the IMAP poller that fills it starts
+	// only when creds are configured. Scoring reuses the owner's CV skills via a port
+	// (ADR-0001); ingested items are attributed to the admin.
+	intakeSvc := intake.NewService(
+		intake.NewSQLiteRepo(database),
+		func(ctx context.Context) ([]string, error) {
+			p, err := cvSvc.GetProfile(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return p.Skills, nil
+		},
+		cfg.IntakeMinScore,
+	)
+	intake.RegisterRoutes(mux, authH.Protect, intakeSvc)
+
+	var intakeStopped <-chan struct{}
+	if cfg.IntakeEnabled() {
+		source := intake.NewIMAPSource(intake.IMAPConfig{
+			Host:     cfg.IntakeIMAPHost,
+			Port:     cfg.IntakeIMAPPort,
+			Username: cfg.IntakeIMAPUsername,
+			Password: cfg.IntakeIMAPPassword,
+			Mailbox:  cfg.IntakeIMAPMailbox,
+			From:     cfg.IntakeIMAPFrom,
+		})
+		userStore := auth.NewUserStore(database.DB)
+		owner := func(ctx context.Context) (string, error) {
+			// The polled inbox belongs to one Mirante account: the one whose e-mail is
+			// the IMAP login. Attribute ingested items there, falling back to the admin
+			// (covers a single-user instance where the two coincide, or a misconfigured
+			// e-mail).
+			if email := strings.ToLower(strings.TrimSpace(cfg.IntakeIMAPUsername)); email != "" {
+				if u, err := userStore.GetByEmail(ctx, email); err == nil {
+					return u.ID, nil
+				}
+			}
+			u, err := userStore.Admin(ctx)
+			if errors.Is(err, auth.ErrUserNotFound) {
+				return "", nil // unclaimed instance — idle until first signup
+			}
+			if err != nil {
+				return "", err
+			}
+			return u.ID, nil
+		}
+		intakeStopped = intake.NewRunner(source, intakeSvc, owner, cfg.IntakePollInterval, log).Start(ctx)
+		log.Info("intake poller started",
+			"mailbox", cfg.IntakeIMAPMailbox, "from", cfg.IntakeIMAPFrom, "interval", cfg.IntakePollInterval)
+	}
 
 	monitorRepo := monitor.NewSQLiteRepo(database)
 	monitorMgr := monitor.NewManager(monitorRepo)
@@ -253,6 +307,9 @@ func run() error {
 		monitorSched.Stop()
 		<-sweepDone
 		<-compactDone
+		if intakeStopped != nil {
+			<-intakeStopped
+		}
 		return err
 	}
 }

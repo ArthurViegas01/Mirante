@@ -19,6 +19,7 @@ const (
 	CatBanco      Category = "banco"
 	CatInfra      Category = "infra"
 	CatCloud      Category = "cloud"
+	CatPlataforma Category = "plataforma"
 	CatFerramenta Category = "ferramenta"
 	CatConceito   Category = "conceito"
 )
@@ -50,6 +51,7 @@ var catalog = []Skill{
 	{Canonical: "Rust", Category: CatLinguagem},
 	{Canonical: "Kotlin", Category: CatLinguagem},
 	{Canonical: "Swift", Category: CatLinguagem},
+	{Canonical: "Dart", Category: CatLinguagem},
 	{Canonical: "SQL", Category: CatLinguagem},
 	{Canonical: "HTML", Category: CatLinguagem, Aliases: []string{"html5"}},
 	{Canonical: "CSS", Category: CatLinguagem, Aliases: []string{"css3"}},
@@ -58,6 +60,7 @@ var catalog = []Skill{
 	// --- Frameworks / bibliotecas ---
 	{Canonical: "React", Category: CatFramework, Aliases: []string{"react.js", "reactjs"}, Related: []string{"JavaScript"}},
 	{Canonical: "React Native", Category: CatFramework, Aliases: []string{"react-native"}, Related: []string{"React"}},
+	{Canonical: "Flutter", Category: CatFramework, Related: []string{"Dart"}},
 	{Canonical: "Vue", Category: CatFramework, Aliases: []string{"vue.js", "vuejs"}, Related: []string{"JavaScript"}},
 	{Canonical: "Angular", Category: CatFramework, Aliases: []string{"angular.js", "angularjs"}, Related: []string{"TypeScript"}},
 	{Canonical: "Svelte", Category: CatFramework, Related: []string{"JavaScript"}},
@@ -74,6 +77,16 @@ var catalog = []Skill{
 	{Canonical: ".NET", Category: CatFramework, Aliases: []string{"dotnet", "asp.net", ".net core"}, Related: []string{"C#"}},
 	{Canonical: "Tailwind CSS", Category: CatFramework, Aliases: []string{"tailwind", "tailwindcss"}, Related: []string{"CSS"}},
 	{Canonical: "GSAP", Category: CatFramework},
+
+	// --- Plataformas / CMS / e-commerce / no-code ---
+	{Canonical: "WordPress", Category: CatPlataforma, Aliases: []string{"wp"}, Related: []string{"PHP"}},
+	{Canonical: "WooCommerce", Category: CatPlataforma, Aliases: []string{"woo commerce"}, Related: []string{"WordPress"}},
+	{Canonical: "Elementor", Category: CatPlataforma, Related: []string{"WordPress"}},
+	{Canonical: "Shopify", Category: CatPlataforma},
+	{Canonical: "Wix", Category: CatPlataforma},
+	{Canonical: "Webflow", Category: CatPlataforma},
+	{Canonical: "Squarespace", Category: CatPlataforma},
+	{Canonical: "Bubble", Category: CatPlataforma},
 
 	// --- Bancos de dados ---
 	{Canonical: "PostgreSQL", Category: CatBanco, Aliases: []string{"postgres", "psql"}, Related: []string{"SQL"}},
@@ -111,6 +124,13 @@ var catalog = []Skill{
 	{Canonical: "gRPC", Category: CatFerramenta},
 	{Canonical: "OpenTelemetry", Category: CatFerramenta, Aliases: []string{"otel"}},
 	{Canonical: "Figma", Category: CatFerramenta},
+	{Canonical: "Pentaho", Category: CatFerramenta, Aliases: []string{"pentaho pdi", "pdi/kettle", "kettle", "pdi"}},
+	{Canonical: "Power BI", Category: CatFerramenta, Aliases: []string{"powerbi"}},
+	{Canonical: "Tableau", Category: CatFerramenta},
+	{Canonical: "n8n", Category: CatFerramenta},
+	{Canonical: "Make.com", Category: CatFerramenta, Aliases: []string{"integromat"}},
+	{Canonical: "Zapier", Category: CatFerramenta},
+	{Canonical: "Twilio", Category: CatFerramenta},
 
 	// --- Conceitos / práticas ---
 	{Canonical: "Microserviços", Category: CatConceito, Aliases: []string{"microservices", "microsserviços"}},

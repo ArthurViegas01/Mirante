@@ -191,6 +191,16 @@ func (s *UserStore) GetByID(ctx context.Context, id string) (*User, error) {
 	return scanUser(row)
 }
 
+// Admin returns the instance owner — the admin account, oldest first — or
+// ErrUserNotFound on a fresh instance not yet claimed by a signup. Used by
+// background workers (e.g. the intake poller) to attribute work to the owner.
+func (s *UserStore) Admin(ctx context.Context) (*User, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, email, name, password_hash, role, status, created_at, updated_at
+		 FROM users WHERE role = ? ORDER BY created_at LIMIT 1`, RoleAdmin)
+	return scanUser(row)
+}
+
 func scanUser(row interface{ Scan(dest ...any) error }) (*User, error) {
 	var (
 		u                    User
