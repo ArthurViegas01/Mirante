@@ -20,6 +20,12 @@ import (
 // server-side never lingers in the pool long enough to surface as a query error.
 const connMaxLifetime = 5 * time.Minute
 
+// connMaxIdleTime is kept under the libSQL/sqld hrana stream idle expiry (~10s) so
+// a pooled connection never outlives its server-side stream and then fails on reuse
+// ("stream is expired" — the dev sqld logs this every monitor reconcile otherwise).
+// The reconnect cost is negligible at this app's traffic.
+const connMaxIdleTime = 8 * time.Second
+
 // DB embeds *sql.DB and adds transaction helpers.
 type DB struct {
 	*sql.DB
@@ -51,7 +57,7 @@ func Open(ctx context.Context, url, authToken string) (*DB, error) {
 		// Local SQLite file: one writer avoids SQLITE_BUSY entirely.
 		sqlDB.SetMaxOpenConns(1)
 	}
-	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(connMaxIdleTime)
 
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
