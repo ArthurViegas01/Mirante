@@ -63,6 +63,7 @@
 </script>
 
 {#if open}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div class="backdrop" transition:fade={{ duration: 160 }} onclick={close} role="presentation">
 		<div
 			class="dialog size-{size}"
