@@ -88,7 +88,7 @@
 		},
 		{
 			href: '/propostas',
-			label: 'Propostas',
+			label: '/Propostas',
 			icon: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'
 		}
 	];
@@ -203,12 +203,14 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 7px;
-		/* Height tuned so the divider lines up with the topbar's bottom border:
-		   sidebar padding-top (18) + brand height (49) = topbar height (66 + 1px border). */
-		height: 49px;
-		/* Negative side margins + matching padding extend the bottom border edge
-		   to edge of the rail (the sidebar pads 14px on each side). */
-		margin: 0 -14px 12px;
+		/* The brand spans the full rail-top → divider band (67px = topbar height),
+		   so its centered content has equal space above and below. The negative top
+		   margin pulls it up over the sidebar's 18px top padding; the divider (bottom
+		   border) still lands at 67px, lined up with the topbar's bottom border. */
+		height: 67px;
+		/* Negative margins reach the rail edges: 14px on the sides (sidebar side
+		   padding) and 18px on top (sidebar top padding). */
+		margin: -18px -14px 12px;
 		padding: 0 20px;
 		border-bottom: var(--border-width-1) solid rgba(255, 255, 255, 0.09);
 		color: #ffffff;
@@ -259,7 +261,9 @@
 		color: rgba(255, 255, 255, 0.5);
 		white-space: nowrap;
 		overflow: hidden;
-		transition: opacity var(--collapse-dur) var(--ease-out);
+		transition:
+			opacity var(--collapse-dur) var(--ease-out),
+			transform var(--collapse-dur) var(--ease-out);
 	}
 	/* Extra breathing room when a section label follows another section's list. */
 	.nav + .section-label {
@@ -311,14 +315,15 @@
 	/* The label is a flex item whose width + opacity animate, so it slides and
 	   fades out as the rail collapses (the icon re-centers via the padding above). */
 	.nav a span {
-		margin-left: 10px;
+		margin-left: 5px;
 		max-width: 130px;
 		overflow: hidden;
 		white-space: nowrap;
 		transition:
 			margin-left var(--collapse-dur) var(--ease-out),
 			max-width var(--collapse-dur) var(--ease-out),
-			opacity var(--collapse-dur) var(--ease-out);
+			opacity var(--collapse-dur) var(--ease-out),
+			transform var(--collapse-dur) var(--ease-out);
 	}
 	.nav a:hover {
 		background-color: rgba(255, 255, 255, 0.04);
@@ -355,6 +360,9 @@
 			align-items: center;
 			justify-content: center;
 			height: auto;
+			/* Keep the top breathing room here (the expanded brand's -18px pull-up
+			   would otherwise glue the mark to the rail's top edge). */
+			margin-top: 0;
 			gap: 12px;
 			padding: 0 0 14px;
 		}
@@ -367,6 +375,7 @@
 		   subtle separator between the icon groups. */
 		:global(html[data-sidebar='collapsed']) .section-label {
 			opacity: 0;
+			transform: translateX(-8px);
 		}
 		/* The admin label sits right after the divider, so its (invisible) box
 		   would leave a big gap above the Usuários icon. The divider already marks
@@ -384,6 +393,7 @@
 			margin-left: 0;
 			max-width: 0;
 			opacity: 0;
+			transform: translateX(-8px);
 		}
 		/* Hover/focus tooltip bubble carrying the label, to the right of the icon. */
 		:global(html[data-sidebar='collapsed']) .nav a::after {

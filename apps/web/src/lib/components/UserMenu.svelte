@@ -86,7 +86,6 @@
 	.trigger {
 		display: flex;
 		align-items: center;
-		gap: 9px;
 		width: 100%;
 		padding: 8px;
 		border: none;
@@ -130,6 +129,14 @@
 		gap: 1px;
 		min-width: 0;
 		flex: 1;
+		/* margin replaces the trigger's gap so it can collapse to 0 on the rail. */
+		margin-left: 9px;
+		max-width: 200px;
+		overflow: hidden;
+		transition:
+			max-width var(--collapse-dur) var(--ease-out),
+			margin-left var(--collapse-dur) var(--ease-out),
+			opacity var(--collapse-dur) var(--ease-out);
 	}
 	.who .name {
 		font-size: 12.5px;
@@ -142,7 +149,14 @@
 	.chev {
 		color: rgba(255, 255, 255, 0.5);
 		flex-shrink: 0;
-		transition: transform var(--dur-fast) var(--ease-out);
+		margin-left: 9px;
+		max-width: 24px;
+		overflow: hidden;
+		transition:
+			transform var(--dur-fast) var(--ease-out),
+			max-width var(--collapse-dur) var(--ease-out),
+			margin-left var(--collapse-dur) var(--ease-out),
+			opacity var(--collapse-dur) var(--ease-out);
 	}
 	.chev.up {
 		transform: rotate(180deg);
@@ -151,25 +165,14 @@
 	/* Collapsed rail (desktop): avatar only, and the dropdown opens to the side
 	   as a flyout instead of upward. Driven by the <html> attribute. */
 	@media (min-width: 721px) {
-		:global(html[data-sidebar='collapsed']) .trigger {
-			justify-content: center;
-			padding: 8px 0;
-		}
-		/* Keep the name as the trigger's accessible name (avatar + chevron are
-		   aria-hidden), so hide it visually rather than with display:none. */
-		:global(html[data-sidebar='collapsed']) .who {
-			position: absolute;
-			width: 1px;
-			height: 1px;
-			padding: 0;
-			margin: -1px;
-			overflow: hidden;
-			clip: rect(0, 0, 0, 0);
-			white-space: nowrap;
-			border: 0;
-		}
+		/* Name + chevron collapse (width + fade) so the trigger slides down to just
+		   the avatar instead of snapping; the avatar centers via the trigger's own
+		   padding. Not display:none, so the name stays the trigger's accessible name. */
+		:global(html[data-sidebar='collapsed']) .who,
 		:global(html[data-sidebar='collapsed']) .chev {
-			display: none;
+			max-width: 0;
+			margin-left: 0;
+			opacity: 0;
 		}
 		:global(html[data-sidebar='collapsed']) .menu {
 			left: calc(100% + 12px);
