@@ -83,6 +83,7 @@ func resolve(url, authToken string) (driver, dsn string, err error) {
 	case strings.HasPrefix(url, "libsql://"),
 		strings.HasPrefix(url, "http://"),
 		strings.HasPrefix(url, "https://"),
+		strings.HasPrefix(url, "ws://"),
 		strings.HasPrefix(url, "wss://"):
 		if authToken != "" {
 			url = appendQuery(url, "authToken="+authToken)

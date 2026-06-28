@@ -20,8 +20,8 @@ services:
       - WEB_ORIGIN=http://localhost:5173
       - DATABASE_URL=http://libsql:8080
       - SESSION_COOKIE_NAME=mirante_session
-      - OWNER_EMAIL=owner@example.com
-      - OWNER_PASSWORD=change-me-dev
+      - OWNER_EMAIL=${OWNER_EMAIL:-arthurpviegas@gmail.com}
+      - OWNER_PASSWORD=${OWNER_PASSWORD:-SenhaMirante1@}
       # LLM (F3). Set GROQ_API_KEY in a .env file at the repo root (gitignored);
       # compose substitutes it here. Empty = LLM features stay disabled.
       - LLM_PROVIDER=groq
@@ -59,6 +59,9 @@ services:
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     environment:
       - API_URL=http://api:8080
+      # Bind mounts no Docker (Windows/macOS) não propagam eventos de arquivo;
+      # o polling deixa o HMR do vite enxergar suas edições sem recriar o container.
+      - CHOKIDAR_USEPOLLING=true
     volumes:
       - ./apps/web:/app
       - /app/node_modules # anonymous volume: keep container's linux node_modules
