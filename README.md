@@ -9,7 +9,8 @@
 pruning), Tarefas, Stacks & Custos, Vagas/CV/CRM com IA (Groq), webhooks de alerta e
 observabilidade OTLP — além de prontidão de produção (banco Turso, deploy Fly).
 **Não lançado:** **multiusuário** (isolamento por usuário + cadastro com aprovação
-do admin) e recuperação de senha por e-mail. Ver [CHANGELOG.md](CHANGELOG.md).
+do admin), recuperação de senha por e-mail e **importação de projeto via link do
+GitHub**. Ver [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -21,7 +22,7 @@ como espinha de tudo:
 
 | Área | O que faz |
 |---|---|
-| **Projetos** | Cadastro central. Tudo se vincula a um projeto. |
+| **Projetos** | Cadastro central (importa de um link de repositório do GitHub). Tudo se vincula a um projeto. |
 | **Monitor** | Saúde ao vivo dos serviços de cada projeto, com alertas in-app. |
 | **Tarefas** | Atividades vinculáveis a projetos e a vagas. |
 | **Vagas & CV** | Aderência (determinística + LLM), CV mestre adaptável, e-mail/carta e CRM de candidaturas. |

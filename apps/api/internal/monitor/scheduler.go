@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	idb "github.com/lumni/mirante/internal/platform/db"
 )
 
 type serviceLoop struct {
@@ -89,7 +91,12 @@ func (s *Scheduler) Stop() {
 }
 
 func (s *Scheduler) reconcile() {
-	services, err := s.repo.ListEnabledServices(s.rootCtx)
+	var services []*Service
+	err := idb.Retry(s.rootCtx, func() error {
+		var e error
+		services, e = s.repo.ListEnabledServices(s.rootCtx)
+		return e
+	})
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			s.log.Warn("monitor reconcile: list services", "err", err)

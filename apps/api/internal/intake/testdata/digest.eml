@@ -1,0 +1,1191 @@
+Delivered-To: arthurpviegas@gmail.com
+Received: by 2002:adf:e34b:0:b0:463:611b:f2fb with SMTP id n11csp530903wrj;
+        Wed, 24 Jun 2026 02:38:33 -0700 (PDT)
+X-Received: by 2002:a05:620a:2913:b0:915:a34e:cb68 with SMTP id af79cd13be357-9278357065emr409905485a.34.1782293913662;
+        Wed, 24 Jun 2026 02:38:33 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1782293913; cv=none;
+        d=google.com; s=arc-20260327;
+        b=GG9+CSpqIWDQ7JkBaQNhxWR1VyCjo6rvztUnV6Hz4vMf9/U3jpavcU4kjuZPVHrMO4
+         m8oZFuF/wYcJ48nHFN9/QS/wmNlSXiFTCVxgf0aWFr3Frrmzu2+mOOn65IK3p76XPUwz
+         Chb/mc3G32fC6Auyv040xJ85kN6P83/WrU+ryixP10KXKTHwmPvWZ8IYOmuw5GH5wgpY
+         NPwawCCVEjEHshkgQfq4NhzzQVopYYfIEvhhLRlIuKDO0TkliOjLvWMOsAg0ZtzEXss8
+         zjueahYd/tJ+exMcDsRwO7fppnVFZlrKJ4SDP/1eLZxgukzF6w20mbLovKGtKk8Optk9
+         4s+w==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=feedback-id:content-transfer-encoding:mime-version:subject
+         :message-id:to:from:date:dkim-signature:dkim-signature;
+        bh=oMGa8uUczBEzKzbt6PK8UoNqRC21tKTHInqrer32Yq8=;
+        fh=csXvsmyt4YzehBR/DDRTZjrWOYvqiEpUqwM/ZmWM/8U=;
+        b=KxZthnD94Pqw9q3tWEdQz6DBnTC8E+snv0w35y+lXrj9p1SjJu1h6ZRDS5kMAFqByu
+         OQo9oRmCQNfBwPnG04HOjfdyKX/OhXrvNWf7gaSwK1+PGhD9Fz86Buy7jk4sAprCHl/z
+         x5Z6eZIzTMW9DaTgKpXd7ljQdYXwGNM6awcIjwSngk3mj7BqVWsxIsfEUlQHZR0L6UzX
+         7aSSE7jp3+C5ofhKhJC4JtuC1D/JV6L8WKNJ3G60oNJr36jaS8ycfqzkjUMaG/OlO/1l
+         Hb0iyT6WGgzt/n636uQjmvHHak+jF//ux9yboTE50PeRdgH7zdVhbzyYVT4xllL+k3oz
+         D6DQ==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@99freelas.com.br header.s=kzoh5kihms2gqpzoqd3shq63f5ulvx7x header.b=vo5n7YEP;
+       dkim=pass header.i=@amazonses.com header.s=224i4yxa5dv7c2xz3womw6peuasteono header.b=XEgOjc+D;
+       spf=pass (google.com: domain of 0100019ef8fede18-69e899a8-6802-4dcc-8461-2d488cc3240d-000000@amazonses.com designates 54.240.11.148 as permitted sender) smtp.mailfrom=0100019ef8fede18-69e899a8-6802-4dcc-8461-2d488cc3240d-000000@amazonses.com;
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=99freelas.com.br
+Return-Path: <0100019ef8fede18-69e899a8-6802-4dcc-8461-2d488cc3240d-000000@amazonses.com>
+Received: from a11-148.smtp-out.amazonses.com (a11-148.smtp-out.amazonses.com. [54.240.11.148])
+        by mx.google.com with ESMTPS id af79cd13be357-925fd487463si614744285a.62.2026.06.24.02.38.33
+        for <arthurpviegas@gmail.com>
+        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+        Wed, 24 Jun 2026 02:38:33 -0700 (PDT)
+Received-SPF: pass (google.com: domain of 0100019ef8fede18-69e899a8-6802-4dcc-8461-2d488cc3240d-000000@amazonses.com designates 54.240.11.148 as permitted sender) client-ip=54.240.11.148;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@99freelas.com.br header.s=kzoh5kihms2gqpzoqd3shq63f5ulvx7x header.b=vo5n7YEP;
+       dkim=pass header.i=@amazonses.com header.s=224i4yxa5dv7c2xz3womw6peuasteono header.b=XEgOjc+D;
+       spf=pass (google.com: domain of 0100019ef8fede18-69e899a8-6802-4dcc-8461-2d488cc3240d-000000@amazonses.com designates 54.240.11.148 as permitted sender) smtp.mailfrom=0100019ef8fede18-69e899a8-6802-4dcc-8461-2d488cc3240d-000000@amazonses.com;
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=99freelas.com.br
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;
+	s=kzoh5kihms2gqpzoqd3shq63f5ulvx7x; d=99freelas.com.br;
+	t=1782293913;
+	h=Date:From:To:Message-ID:Subject:MIME-Version:Content-Type:Content-Transfer-Encoding;
+	bh=xblF5potq5iJD5VjA+AsJMJiAquIn6JygHsaF9QkcMU=;
+	b=vo5n7YEPxJ9ULbZ218ptcP0SDVA5jHlreYkMX69kBxwwXg9a7/EyI6g+YoggrQVi
+	UwFkUAyxq918xJ+11Dds5b40D0VO81A9qOqb2CtlH+sljsHnwWJsLZdRW2Yd9Ue7Y/N
+	dtPRjVV+kVpZ7NeraLcVN/ZqAgw3oR6c+imBA76I=
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple;
+	s=224i4yxa5dv7c2xz3womw6peuasteono; d=amazonses.com; t=1782293913;
+	h=Date:From:To:Message-ID:Subject:MIME-Version:Content-Type:Content-Transfer-Encoding:Feedback-ID;
+	bh=xblF5potq5iJD5VjA+AsJMJiAquIn6JygHsaF9QkcMU=;
+	b=XEgOjc+Dq176iWQXK2CRm5X3xArST6fHykts3DqMDDkQiaBZ9ibwiNr2ifuymHA0
+	K1mf7oU++Figvj2Dgj/4mkk5+nfPN0I7Cn1LRJ0C9lCsLFKoUt79pp0Z6kpDCKVFZiG
+	dAa940Q8CxJkIxfaBNCgi4Qo0BKAqZ8V3Ut17ybQ=
+Date: Wed, 24 Jun 2026 09:38:33 +0000
+From: 99Freelas <no-reply@99freelas.com.br>
+To: arthurpviegas@gmail.com
+Message-ID: <0100019ef8fede18-69e899a8-6802-4dcc-8461-2d488cc3240d-000000@email.amazonses.com>
+Subject: Novos projetos
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+Feedback-ID: ::1.us-east-1.TEkZR5OALAcYZX9L9sUb9IYuLWKHojKCknm6guxLVgs=:AmazonSES
+X-SES-Outgoing: 2026.06.24-54.240.11.148
+
+
+
+
+
+
+
+<html xmlns=3D"http://www.w3.org/1999/xhtml">
+=09<head>
+=09=09<meta charset=3D"UTF-8" />
+=09=09<title></title>
+=09=09<!-- <meta http-equiv=3D"Content-Type" content=3D"text/html; " /> -->
+=09=09<meta name=3D"viewport" content=3D"width=3Ddevice-width, initial-scal=
+e=3D1.0" />
+
+=09=09<style type=3D"text/css">
+=09=09=09=09@media only screen and (max-width: 410px) {
+=09=09=09=09=09.table-center-mobile {
+=09=09=09=09=09=09width: 100%;
+=09=09=09=09=09=09text-align: center !important;
+=09=09=09=09=09=09float: none;
+=09=09=09=09=09}
+
+=09=09=09=09=09.table-blog-post-img {
+=09=09=09=09=09=09width: 100%;
+=09=09=09=09=09=09float: none;
+=09=09=09=09=09}
+
+=09=09=09=09=09.table-blog-post-text {
+=09=09=09=09=09=09width: 100%;
+=09=09=09=09=09=09margin-top: 10px;
+=09=09=09=09=09}
+=09=09=09=09}
+
+=09=09=09=09@media only screen and (max-width: 550px) {
+=09=09=09=09=09.table-rodape-links,
+=09=09=09=09=09.table-rodape-social {
+=09=09=09=09=09=09width: 100% !important;
+=09=09=09=09=09=09text-align: center;
+=09=09=09=09=09=09float: none;
+=09=09=09=09=09}
+
+=09=09=09=09=09.table-rodape-social {
+=09=09=09=09=09=09margin-top: 10px;
+=09=09=09=09=09}
+=09=09=09=09}
+
+=09=09=09
+=09=09</style>
+=09</head>
+=09<body style=3D"background-color: #e7e5e7; margin: 0; padding: 0;">
+=09=09<div style=3D"max-height:0; overflow:hidden; display:none; mso-hide: =
+all;">Ol=C3=A1, Arthur Viegas, h=C3=A1 novos projetos que possam ser do seu=
+ interesse. Veja os detalhes.</div>
+=09=09<img style=3D"display: none;" src=3D"https://d1fuainj13qzhu.cloudfron=
+t.net/2.9.70/images/invisible.png" width=3D"1" height=3D"1" border=3D"0" al=
+t=3D"" />
+=09=09<table width=3D"100%" style=3D"background-color: #e7e5e7; margin: 0; =
+padding: 0;" cellpadding=3D"0" cellspacing=3D"0" border=3D"0">
+=09=09=09<tr>
+=09=09=09=09<td>
+=09=09=09=09=09<table width=3D"100%" style=3D"max-width: 600px; table-layou=
+t: fixed; background-color: red; font-family: 'Helvetica', 'Arial', sans-se=
+rif;" align=3D"center" cellpadding=3D"0" cellspacing=3D"0" border=3D"0">
+=09=09=09=09=09=09<tbody>
+=09=09=09=09=09=09=09=09<tr>
+=09=09=09=09=09=09=09=09=09<td style=3D"text-align: center; background-colo=
+r: #e7e5e7; padding: 10px 0px; font-size: 12px; margin: 0;">
+=09=09=09=09=09=09=09=09=09=09=09<a style=3D"color: #000; text-decoration: =
+none;" href=3D"https://www.99freelas.com.br/email/view?token=3Dafc75bc8-2c3=
+6-471d-a4f8-d27ab35bea6b&email=3Darthurpviegas@gmail.com">Visualizar no nav=
+egador</a>
+
+=09=09=09=09=09=09=09=09=09=09=09 |
+
+=09=09=09=09=09=09=09=09=09=09=09<a style=3D"color: #000; text-decoration: =
+none;" href=3D"https://www.99freelas.com.br/email/cancel-subscription?token=
+=3Dafc75bc8-2c36-471d-a4f8-d27ab35bea6b&email=3Darthurpviegas@gmail.com">Ca=
+ncelar inscri=C3=A7=C3=A3o</a>
+=09=09=09=09=09=09=09=09=09</td>
+=09=09=09=09=09=09=09=09</tr>
+
+=09=09=09=09=09=09=09<tr>
+
+
+=09=09=09=09=09=09=09=09<td width=3D"100%" style=3D"background-color: #00b6=
+c1; padding: 25px 35px;">
+=09=09=09=09=09=09=09=09=09<table class=3D"table-center-mobile" width=3D"50=
+%" height=3D"33" cellpadding=3D"0" cellspacing=3D"0" border=3D"0" align=3D"=
+left" style=3D"">
+=09=09=09=09=09=09=09=09=09=09<tbody>
+=09=09=09=09=09=09=09=09=09=09=09<tr>
+=09=09=09=09=09=09=09=09=09=09=09=09<td>
+=09=09=09=09=09=09=09=09=09=09=09=09=09<img width=3D"123" height=3D"33" src=
+=3D"https://d1fuainj13qzhu.cloudfront.net/2.9.70/images/99freelas_email_cle=
+an.png" alt=3D"99Freelas" />
+=09=09=09=09=09=09=09=09=09=09=09=09</td>
+=09=09=09=09=09=09=09=09=09=09=09</tr>
+=09=09=09=09=09=09=09=09=09=09</tbody>
+=09=09=09=09=09=09=09=09=09</table>
+
+=09=09=09=09=09=09=09=09=09=09<table class=3D"table-center-mobile" width=3D=
+"50%" height=3D"33" style=3D"text-align: right; color: #fff;" cellpadding=
+=3D"0" cellspacing=3D"0" border=3D"0">
+=09=09=09=09=09=09=09=09=09=09=09<tbody>
+=09=09=09=09=09=09=09=09=09=09=09=09<tr>
+=09=09=09=09=09=09=09=09=09=09=09=09=09<td style=3D"font-size: 18px;">
+=09=09=09=09=09=09=09=09=09=09=09=09=09=0924 de junho
+=09=09=09=09=09=09=09=09=09=09=09=09=09</td>
+=09=09=09=09=09=09=09=09=09=09=09=09</tr>
+=09=09=09=09=09=09=09=09=09=09=09</tbody>
+=09=09=09=09=09=09=09=09=09=09</table>
+=09=09=09=09=09=09=09=09</td>
+=09=09=09=09=09=09=09</tr>
+
+=09=09=09=09=09=09=09<tr>
+
+
+=09=09=09=09=09=09=09=09<td width=3D"100%" style=3D"background-color: #fff;=
+ padding: 50px 35px;">
+=09<p style=3D"font-size: 28px; margin-bottom: 10px; margin-top: 0; color: =
+#000;"><b>Ol=C3=A1, Arthur Viegas.</b></p>
+
+=09<p style=3D"font-size: 14px; color: #5b5a5a; margin-bottom: 5px; margin-=
+top: 0px;">H=C3=A1 novos projetos que possam ser do seu interesse:</p>
+
+
+=09=09<p style=3D"font-size: 22px; margin-top: 25px; margin-bottom: 0px; co=
+lor: #000; border-bottom: 1px solid #E8E8E8; padding-bottom: 4px;"><b>Web, =
+Mobile &amp; Software</b></p>
+
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/mvp-de-micro-saas-para=
+-profissionais-da-saude-762750">MVP de micro-SaaS para profissionais da sa=
+=C3=BAde</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Especialista |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 08:11</b> |
+=09=09=09=09Tempo restante: <b>6 dias e 1 hora</b> |
+=09=09=09=09Propostas: <b>73</b> |
+=09=09=09=09Interessados: <b>92</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Ol=C3=A1, tudo bem?
+
+Estou buscando um profissional para desenvolver o MVP de um micro-SaaS volt=
+ado a profissionais da sa=C3=BAde.
+
+A ideia =C3=A9 criar uma ferramenta simp... <a style=3D"color: #0094b5; tex=
+t-decoration: none;" href=3D"https://www.99freelas.com.br/project/mvp-de-mi=
+cro-saas-para-profissionais-da-saude-762750">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/mvp-de-micro-saas-para-profissiona=
+is-da-saude-762750">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/mvp-de-micro-saas-para-profiss=
+ionais-da-saude-762750">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/desenvolver-crm-imobil=
+iario-com-ia-whatsapp-e-automacao-de-leads-762751">Desenvolver CRM imobili=
+=C3=A1rio com IA, WhatsApp e automa=C3=A7=C3=A3o de leads</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Cria=C3=A7=C3=A3o &amp; Integra=C3=A7=C3=A3o com IA |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>22/06/2026 =C3=A0s 23:58</b> |
+=09=09=09=09Tempo restante: <b>28 dias e 17 horas</b> |
+=09=09=09=09Propostas: <b>46</b> |
+=09=09=09=09Interessados: <b>56</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Estou procurando um desenvolvedor ou especialista em automa=C3=
+=A7=C3=B5es para construir um sistema de CRM imobili=C3=A1rio com integra=
+=C3=A7=C3=A3o de IA.
+
+O objetivo =C3=A9 criar um sis... <a style=3D"color: #0094b5; text-decorati=
+on: none;" href=3D"https://www.99freelas.com.br/project/desenvolver-crm-imo=
+biliario-com-ia-whatsapp-e-automacao-de-leads-762751">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/desenvolver-crm-imobiliario-com-ia=
+-whatsapp-e-automacao-de-leads-762751">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/desenvolver-crm-imobiliario-co=
+m-ia-whatsapp-e-automacao-de-leads-762751">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/criacao-de-site-com-lo=
+ja-integrada-762766">Cria=C3=A7=C3=A3o de site com loja integrada</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 02:15</b> |
+=09=09=09=09Tempo restante: <b>13 dias e 19 horas</b> |
+=09=09=09=09Propostas: <b>46</b> |
+=09=09=09=09Interessados: <b>60</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Ol=C3=A1!
+
+Necessito da cria=C3=A7=C3=A3o de um site com loja integrada, com prefer=C3=
+=AAncia pela Nuvemshop.
+Integra=C3=A7=C3=A3o com ERP, atendimento via WhatsApp facilitado e conex=
+=C3=A3o c... <a style=3D"color: #0094b5; text-decoration: none;" href=3D"ht=
+tps://www.99freelas.com.br/project/criacao-de-site-com-loja-integrada-76276=
+6">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/criacao-de-site-com-loja-integrada=
+-762766">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/criacao-de-site-com-loja-integ=
+rada-762766">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/configurar-sistema-de-=
+pagamento-para-saas-762793">Configurar sistema de pagamento para SaaS</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 09:00</b> |
+=09=09=09=09Tempo restante: <b>6 dias e 2 horas</b> |
+=09=09=09=09Propostas: <b>47</b> |
+=09=09=09=09Interessados: <b>57</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Preciso de um desenvolvedor para configurar e testar o sistema =
+de pagamento do meu SaaS. Usava Stripe, mas migrei para AbacatePay e estou =
+sem tempo para conf... <a style=3D"color: #0094b5; text-decoration: none;" =
+href=3D"https://www.99freelas.com.br/project/configurar-sistema-de-pagament=
+o-para-saas-762793">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/configurar-sistema-de-pagamento-pa=
+ra-saas-762793">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/configurar-sistema-de-pagament=
+o-para-saas-762793">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/mvp-web-para-preparaca=
+o-de-concursos-municipais-na-area-de-educacao-762819">MVP web para prepara=
+=C3=A7=C3=A3o de concursos municipais na =C3=A1rea de educa=C3=A7=C3=A3o</a=
+>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Iniciante |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 10:32</b> |
+=09=09=09=09Tempo restante: <b>14 dias e 3 horas</b> |
+=09=09=09=09Propostas: <b>68</b> |
+=09=09=09=09Interessados: <b>85</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Ol=C3=A1.
+
+Estou desenvolvendo um MVP para prepara=C3=A7=C3=A3o de concursos p=C3=BAbl=
+icos municipais na =C3=A1rea da educa=C3=A7=C3=A3o.
+
+J=C3=A1 possuo o conte=C3=BAdo, banco de quest=C3=B5es e estrutura p... <a =
+style=3D"color: #0094b5; text-decoration: none;" href=3D"https://www.99free=
+las.com.br/project/mvp-web-para-preparacao-de-concursos-municipais-na-area-=
+de-educacao-762819">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/mvp-web-para-preparacao-de-concurs=
+os-municipais-na-area-de-educacao-762819">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/mvp-web-para-preparacao-de-con=
+cursos-municipais-na-area-de-educacao-762819">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/redesign-de-landing-pa=
+ge-na-greatpages-762837">Redesign de landing page na GreatPages</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09UX/UI &amp; Web Design |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 11:14</b> |
+=09=09=09=09Tempo restante: <b>2 dias e 4 horas</b> |
+=09=09=09=09Propostas: <b>20</b> |
+=09=09=09=09Interessados: <b>27</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Tenho uma landing page de um cliente que est=C3=A1 precisando d=
+e um rebranding, mas ela est=C3=A1 na plataforma GreatPages e preciso mant=
+=C3=AA-la l=C3=A1. J=C3=A1 tenho todos os mat... <a style=3D"color: #0094b5=
+; text-decoration: none;" href=3D"https://www.99freelas.com.br/project/rede=
+sign-de-landing-page-na-greatpages-762837">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/redesign-de-landing-page-na-greatp=
+ages-762837">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/redesign-de-landing-page-na-gr=
+eatpages-762837">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/desenvolvedor-experien=
+te-para-loja-shopify-762866">Desenvolvedor experiente para loja Shopify</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Especialista |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 12:57</b> |
+=09=09=09=09Tempo restante: <b>6 dias e 6 horas</b> |
+=09=09=09=09Propostas: <b>14</b> |
+=09=09=09=09Interessados: <b>18</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Desenvolvimento e customiza=C3=A7=C3=A3o
+- Experi=C3=AAncia no desenvolvimento de temas Shopify personalizados utili=
+zando Liquid e Shopify Online Store 2.0.
+- Capacidade de... <a style=3D"color: #0094b5; text-decoration: none;" href=
+=3D"https://www.99freelas.com.br/project/desenvolvedor-experiente-para-loja=
+-shopify-762866">Leia mais.</a>
+=09=09=09</p>
+
+=09=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10p=
+x; margin-top: 0px;">
+=09=09=09=09=09<b>Habilidades desejadas:</b> Desenvolvimento Shopify, Shopi=
+fy e Shopify Templates
+=09=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/desenvolvedor-experiente-para-loja=
+-shopify-762866">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/desenvolvedor-experiente-para-=
+loja-shopify-762866">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/inteligencia-artificia=
+l-para-monitoramento-de-processos-judiciais-762877">Intelig=C3=AAncia artif=
+icial para monitoramento de processos judiciais</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Cria=C3=A7=C3=A3o &amp; Integra=C3=A7=C3=A3o com IA |
+
+=09=09=09=09Especialista |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 13:19</b> |
+=09=09=09=09Tempo restante: <b>29 dias e 6 horas</b> |
+=09=09=09=09Propostas: <b>41</b> |
+=09=09=09=09Interessados: <b>54</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Preciso de um projeto de intelig=C3=AAncia artificial e machine=
+ learning com o seguinte fluxo: os processos judiciais no Brasil s=C3=A3o p=
+ublicados diariamente no Di=C3=A1r... <a style=3D"color: #0094b5; text-deco=
+ration: none;" href=3D"https://www.99freelas.com.br/project/inteligencia-ar=
+tificial-para-monitoramento-de-processos-judiciais-762877">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/inteligencia-artificial-para-monit=
+oramento-de-processos-judiciais-762877">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/inteligencia-artificial-para-m=
+onitoramento-de-processos-judiciais-762877">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/migracao-de-hospedagem=
+-de-sites-e-e-mails-762886">Migra=C3=A7=C3=A3o de hospedagem de sites e e-m=
+ails</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 13:32</b> |
+=09=09=09=09Tempo restante: <b>6 dias e 6 horas</b> |
+=09=09=09=09Propostas: <b>40</b> |
+=09=09=09=09Interessados: <b>49</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Tenho dois clientes que precisam de migra=C3=A7=C3=A3o de hospe=
+dagem, incluindo site e e-mails.
+
+Um cliente tem os dados na UOL e precisa migrar para a Hostinger. O ou... <=
+a style=3D"color: #0094b5; text-decoration: none;" href=3D"https://www.99fr=
+eelas.com.br/project/migracao-de-hospedagem-de-sites-e-e-mails-762886">Leia=
+ mais.</a>
+=09=09=09</p>
+
+=09=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10p=
+x; margin-top: 0px;">
+=09=09=09=09=09<b>Habilidades desejadas:</b> Hospedagem Web
+=09=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/migracao-de-hospedagem-de-sites-e-=
+e-mails-762886">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/migracao-de-hospedagem-de-site=
+s-e-e-mails-762886">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/design-de-interface-pa=
+ra-loja-nuvemshop-762897">Design de interface para loja Nuvemshop</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 14:08</b> |
+=09=09=09=09Tempo restante: <b>2 dias e 7 horas</b> |
+=09=09=09=09Propostas: <b>22</b> |
+=09=09=09=09Interessados: <b>29</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Preciso criar a interface do meu site na Nuvemshop, cadastrar p=
+rodutos com varia=C3=A7=C3=B5es de cores, inserir descri=C3=A7=C3=B5es e im=
+agens, alinhar o design =C3=A0 identidade da... <a style=3D"color: #0094b5;=
+ text-decoration: none;" href=3D"https://www.99freelas.com.br/project/desig=
+n-de-interface-para-loja-nuvemshop-762897">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/design-de-interface-para-loja-nuve=
+mshop-762897">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/design-de-interface-para-loja-=
+nuvemshop-762897">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/site-com-pagina-de-ven=
+das-e-captacao-de-leads-para-terapeuta-762909">Site com p=C3=A1gina de vend=
+as e capta=C3=A7=C3=A3o de leads para terapeuta</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Iniciante |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 14:40</b> |
+=09=09=09=09Tempo restante: <b>14 dias e 8 horas</b> |
+=09=09=09=09Propostas: <b>71</b> |
+=09=09=09=09Interessados: <b>88</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Sou terapeuta e quero vender e-books, mentorias e um curso pela=
+ internet. Para isso, preciso de um site completo com p=C3=A1ginas de venda=
+s integradas, captura de... <a style=3D"color: #0094b5; text-decoration: no=
+ne;" href=3D"https://www.99freelas.com.br/project/site-com-pagina-de-vendas=
+-e-captacao-de-leads-para-terapeuta-762909">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/site-com-pagina-de-vendas-e-captac=
+ao-de-leads-para-terapeuta-762909">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/site-com-pagina-de-vendas-e-ca=
+ptacao-de-leads-para-terapeuta-762909">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/configuracao-do-whatsa=
+pp-cloud-api-meta-762910">Configura=C3=A7=C3=A3o do WhatsApp Cloud API (Met=
+a)</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Especialista |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 14:46</b> |
+=09=09=09=09Tempo restante: <b>6 dias e 8 horas</b> |
+=09=09=09=09Propostas: <b>31</b> |
+=09=09=09=09Interessados: <b>40</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Preciso de um profissional com experi=C3=AAncia em WhatsApp Clo=
+ud API da Meta para configurar um ambiente novo do zero.
+
+Necessito de apoio para:
+
+- Configurar o ... <a style=3D"color: #0094b5; text-decoration: none;" href=
+=3D"https://www.99freelas.com.br/project/configuracao-do-whatsapp-cloud-api=
+-meta-762910">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/configuracao-do-whatsapp-cloud-api=
+-meta-762910">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/configuracao-do-whatsapp-cloud=
+-api-meta-762910">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/agente-para-automatiza=
+r-fulfillment-e-estoque-no-mercado-livre-762917">Agente para automatizar fu=
+lfillment e estoque no Mercado Livre</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 15:05</b> |
+=09=09=09=09Tempo restante: <b>29 dias e 8 horas</b> |
+=09=09=09=09Propostas: <b>33</b> |
+=09=09=09=09Interessados: <b>44</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Automa=C3=A7=C3=A3o de estoque para Mercado Livre: integra=C3=
+=A7=C3=A3o automatizada para cria=C3=A7=C3=A3o de envios (fulfillment) e al=
+ertas configur=C3=A1veis de vendas e de estoque baixo.
+
+... <a style=3D"color: #0094b5; text-decoration: none;" href=3D"https://www=
+.99freelas.com.br/project/agente-para-automatizar-fulfillment-e-estoque-no-=
+mercado-livre-762917">Leia mais.</a>
+=09=09=09</p>
+
+=09=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10p=
+x; margin-top: 0px;">
+=09=09=09=09=09<b>Habilidades desejadas:</b> Business Intelligence, Design =
+de Intera=C3=A7=C3=A3o, Design de Website, Programa=C3=A7=C3=A3o e Programa=
+=C3=A7=C3=A3o de Banco de Dados
+=09=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/agente-para-automatizar-fulfillmen=
+t-e-estoque-no-mercado-livre-762917">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/agente-para-automatizar-fulfil=
+lment-e-estoque-no-mercado-livre-762917">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/loja-online-de-brinque=
+dos-foco-em-colecionaveis-762929">Loja online de brinquedos (foco em coleci=
+on=C3=A1veis)</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Iniciante |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 15:52</b> |
+=09=09=09=09Tempo restante: <b>6 dias e 9 horas</b> |
+=09=09=09=09Propostas: <b>56</b> |
+=09=09=09=09Interessados: <b>74</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Tenho um dom=C3=ADnio (socarrinho.com.br) e a partir dele gosta=
+ria de montar uma loja online de venda de brinquedos com foco em carrinhos =
+e colecion=C3=A1veis.
+
+- Conf... <a style=3D"color: #0094b5; text-decoration: none;" href=3D"https=
+://www.99freelas.com.br/project/loja-online-de-brinquedos-foco-em-coleciona=
+veis-762929">Leia mais.</a>
+=09=09=09</p>
+
+=09=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10p=
+x; margin-top: 0px;">
+=09=09=09=09=09<b>Habilidades desejadas:</b> Design Gr=C3=A1fico, eCommerce=
+, Loja Integrada, UI Design e UX
+=09=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/loja-online-de-brinquedos-foco-em-=
+colecionaveis-762929">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/loja-online-de-brinquedos-foco=
+-em-colecionaveis-762929">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/publicacao-e-gerenciam=
+ento-de-licencas-de-software-762970">Publica=C3=A7=C3=A3o e gerenciamento d=
+e licen=C3=A7as de software</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Desktop |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 17:33</b> |
+=09=09=09=09Tempo restante: <b>29 dias e 10 horas</b> |
+=09=09=09=09Propostas: <b>9</b> |
+=09=09=09=09Interessados: <b>15</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Estamos na fase final de desenvolvimento de um software para en=
+genharia. Precisamos de algu=C3=A9m que finalize o c=C3=B3digo para que o p=
+rograma seja publicado, confi... <a style=3D"color: #0094b5; text-decoratio=
+n: none;" href=3D"https://www.99freelas.com.br/project/publicacao-e-gerenci=
+amento-de-licencas-de-software-762970">Leia mais.</a>
+=09=09=09</p>
+
+=09=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10p=
+x; margin-top: 0px;">
+=09=09=09=09=09<b>Habilidades desejadas:</b> Arquitetura de Software, Desen=
+volvimento de Software, Portugu=C3=AAs (Brasil), Programa=C3=A7=C3=A3o C# e=
+ VPS
+=09=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/publicacao-e-gerenciamento-de-lice=
+ncas-de-software-762970">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/publicacao-e-gerenciamento-de-=
+licencas-de-software-762970">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/finalizacao-de-site-ed=
+icao-de-template-e-seo-763028">Finaliza=C3=A7=C3=A3o de site, edi=C3=A7=C3=
+=A3o de template e SEO</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 20:47</b> |
+=09=09=09=09Tempo restante: <b>2 dias e 14 horas</b> |
+=09=09=09=09Propostas: <b>25</b> |
+=09=09=09=09Interessados: <b>33</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Tenho um site em desenvolvimento. O antigo desenvolvedor deixou=
+ o projeto e preciso finalizar. Comprei um template e estamos editando e pe=
+rsonalizando as p=C3=A1g... <a style=3D"color: #0094b5; text-decoration: no=
+ne;" href=3D"https://www.99freelas.com.br/project/finalizacao-de-site-edica=
+o-de-template-e-seo-763028">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/finalizacao-de-site-edicao-de-temp=
+late-e-seo-763028">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/finalizacao-de-site-edicao-de-=
+template-e-seo-763028">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/desenvolver-front-end-=
+disponivel-para-projetos-763053">Desenvolver front-end dispon=C3=ADvel para=
+ projetos</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 21:39</b> |
+=09=09=09=09Tempo restante: <b>29 dias e 15 horas</b> |
+=09=09=09=09Propostas: <b>3</b> |
+=09=09=09=09Interessados: <b>7</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Sou desenvolvedor Front-End especializado em HTML e CSS e crio =
+sites modernos, responsivos e com design profissional.
+
+Desenvolvo landing pages, sites instit... <a style=3D"color: #0094b5; text-=
+decoration: none;" href=3D"https://www.99freelas.com.br/project/desenvolver=
+-front-end-disponivel-para-projetos-763053">Leia mais.</a>
+=09=09=09</p>
+
+=09=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10p=
+x; margin-top: 0px;">
+=09=09=09=09=09<b>Habilidades desejadas:</b> CSS, CSS3, HTML e HTML5
+=09=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/desenvolver-front-end-disponivel-p=
+ara-projetos-763053">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/desenvolver-front-end-disponiv=
+el-para-projetos-763053">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/loja-na-loja-integrada=
+-para-velas-aromaticas-home-spray-e-difusor-763056">Loja na Loja Integrada =
+para velas arom=C3=A1ticas, home spray e difusor</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Especialista |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 21:47</b> |
+=09=09=09=09Tempo restante: <b>29 dias e 15 horas</b> |
+=09=09=09=09Propostas: <b>15</b> |
+=09=09=09=09Interessados: <b>19</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Apenas profissionais. Preciso de profissional para criar um sit=
+e na plataforma Loja Integrada.
+Ramo: velas arom=C3=A1ticas, home spray e difusor. <a style=3D"color: #0094=
+b5; text-decoration: none;" href=3D"https://www.99freelas.com.br/project/lo=
+ja-na-loja-integrada-para-velas-aromaticas-home-spray-e-difusor-763056">Lei=
+a mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/loja-na-loja-integrada-para-velas-=
+aromaticas-home-spray-e-difusor-763056">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/loja-na-loja-integrada-para-ve=
+las-aromaticas-home-spray-e-difusor-763056">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/site-institucional-par=
+a-clinica-de-estetica-avancada-763057">Site institucional para cl=C3=ADnica=
+ de est=C3=A9tica avan=C3=A7ada</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Iniciante |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 21:46</b> |
+=09=09=09=09Tempo restante: <b>29 dias e 15 horas</b> |
+=09=09=09=09Propostas: <b>48</b> |
+=09=09=09=09Interessados: <b>59</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Estou procurando um profissional ou empresa especializada em cr=
+ia=C3=A7=C3=A3o de sites institucionais para desenvolver a presen=C3=A7a di=
+gital da minha cl=C3=ADnica de est=C3=A9tica... <a style=3D"color: #0094b5;=
+ text-decoration: none;" href=3D"https://www.99freelas.com.br/project/site-=
+institucional-para-clinica-de-estetica-avancada-763057">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/site-institucional-para-clinica-de=
+-estetica-avancada-763057">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/site-institucional-para-clinic=
+a-de-estetica-avancada-763057">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/criacao-de-site-de-ven=
+das-no-shopify-para-empresa-763061">Cria=C3=A7=C3=A3o de site de vendas no =
+Shopify para empresa</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Desenvolvimento Web |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 22:27</b> |
+=09=09=09=09Tempo restante: <b>29 dias e 15 horas</b> |
+=09=09=09=09Propostas: <b>27</b> |
+=09=09=09=09Interessados: <b>31</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Preciso criar um site de vendas baseado em Shopify para que eu =
+possa anunciar meus produtos.         <a style=3D"color: #0094b5; text-deco=
+ration: none;" href=3D"https://www.99freelas.com.br/project/criacao-de-site=
+-de-vendas-no-shopify-para-empresa-763061">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/criacao-de-site-de-vendas-no-shopi=
+fy-para-empresa-763061">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/criacao-de-site-de-vendas-no-s=
+hopify-para-empresa-763061">Enviar proposta</a>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 18px; margin-bottom: 10px; border-top: 1px =
+solid #D0D0D0; padding-top: 10px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: none; font-weight:=
+ bold;" href=3D"https://www.99freelas.com.br/project/criar-e-configurar-4-a=
+gentes-de-ia-claude-anthropic-763063">Criar e configurar 4 agentes de IA (C=
+laude/Anthropic)</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09=09Cria=C3=A7=C3=A3o &amp; Integra=C3=A7=C3=A3o com IA |
+
+=09=09=09=09Intermedi=C3=A1rio |
+=09=09=09=09Publicado: <b>ontem =C3=A0s 22:11</b> |
+=09=09=09=09Tempo restante: <b>29 dias e 15 horas</b> |
+=09=09=09=09Propostas: <b>10</b> |
+=09=09=09=09Interessados: <b>13</b>
+=09=09=09</p>
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09Procuro um profissional para criar e configurar agentes de inte=
+lig=C3=AAncia artificial para o meu neg=C3=B3cio (ecossistema de educa=C3=
+=A7=C3=A3o e eventos em Curitiba). J=C3=A1 uso... <a style=3D"color: #0094b=
+5; text-decoration: none;" href=3D"https://www.99freelas.com.br/project/cri=
+ar-e-configurar-4-agentes-de-ia-claude-anthropic-763063">Leia mais.</a>
+=09=09=09</p>
+
+
+=09=09=09<p style=3D"font-size: 13px; color: #5b5a5a; margin-bottom: 10px; =
+margin-top: 0px;">
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/criar-e-configurar-4-agentes-de-ia=
+-claude-anthropic-763063">Ver projeto</a>
+=09=09=09=09ou
+=09=09=09=09<a style=3D"color: #0094b5; text-decoration: underline;" href=
+=3D"https://www.99freelas.com.br/project/bid/criar-e-configurar-4-agentes-d=
+e-ia-claude-anthropic-763063">Enviar proposta</a>
+=09=09=09</p>
+
+=09<p style=3D"font-size: 15px; color: #5b5a5a; margin-bottom: 10px; margin=
+-top: 18px; border-top: 1px solid #D0D0D0; padding-top: 20px;">
+=09=09Caso deseje alterar a frequ=C3=AAncia ou o hor=C3=A1rio de recebiment=
+o dos e-mails, basta acessar a qualquer momento a p=C3=A1gina de notifica=
+=C3=A7=C3=B5es e alertas clicando no bot=C3=A3o abaixo (voc=C3=AA precisa e=
+star logado(a) no seu perfil de freelancer).
+=09</p>
+
+=09<p style=3D"text-align: center; margin-top: 42px;">
+=09=09<a style=3D"text-decoration: none; padding: 12px 25px; background-col=
+or: #00b6c1; border-bottom: 3px solid #00a2ad; color: #fff;" href=3D"https:=
+//www.99freelas.com.br/permissions">
+=09=09=09<b>Ver Notifica=C3=A7=C3=B5es e Alertas</b>
+=09=09</a>
+=09</p>
+=09=09=09=09=09=09=09=09</td>
+=09=09=09=09=09=09=09</tr>
+
+=09=09=09=09=09=09=09=09<tr>
+=09=09=09=09=09=09=09=09=09<td width=3D"100%" style=3D"background-color: #f=
+ff; padding: 30px 35px; border-top: 1px solid #eeeeee;">
+=09=09=09=09=09=09=09=09=09=09<table class=3D"table-rodape-links" width=3D"=
+85%" cellpadding=3D"0" cellspacing=3D"0" border=3D"0" align=3D"left">
+=09=09=09=09=09=09=09=09=09=09=09<tbody>
+=09=09=09=09=09=09=09=09=09=09=09=09<tr>
+=09=09=09=09=09=09=09=09=09=09=09=09=09<td>
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09<p style=3D"color: #717171; font-=
+size: 12px; margin-bottom: 0;">
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09=09<a style=3D"color: #717171; fo=
+nt-size: 12px; text-decoration: none;" href=3D"https://www.99freelas.com.br=
+/permissions">Configura=C3=A7=C3=B5es de notifica=C3=A7=C3=B5es</a> |
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09=09<a style=3D"color: #717171; fo=
+nt-size: 12px; text-decoration: none;" href=3D"https://www.99freelas.com.br=
+/privacidade">Politica de privacidade</a> |
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09=09<a style=3D"color: #717171; fo=
+nt-size: 12px; text-decoration: none;" href=3D"https://www.99freelas.com.br=
+/termos">Termos</a>
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09</p>
+
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09<p style=3D"color: #717171; font-=
+size: 12px; margin-top: 7px;"><a style=3D"color: #717171; text-decoration: =
+none;" href=3D"https://www.99freelas.com.br/">99Freelas</a>, 2014 - 2026</p=
+>
+=09=09=09=09=09=09=09=09=09=09=09=09=09</td>
+=09=09=09=09=09=09=09=09=09=09=09=09</tr>
+=09=09=09=09=09=09=09=09=09=09=09</tbody>
+=09=09=09=09=09=09=09=09=09=09</table>
+
+=09=09=09=09=09=09=09=09=09=09<table class=3D"table-rodape-social" width=3D=
+"15%" cellpadding=3D"0" cellspacing=3D"0" border=3D"0">
+=09=09=09=09=09=09=09=09=09=09=09<tbody>
+=09=09=09=09=09=09=09=09=09=09=09=09<tr>
+=09=09=09=09=09=09=09=09=09=09=09=09=09<td>
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09<p style=3D"line-height: 37px;">
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09=09<a href=3D"https://www.faceboo=
+k.com/99freelas"><img width=3D"20" height=3D"20" style=3D"width: 20px; heig=
+ht: 20px;" src=3D"https://d1fuainj13qzhu.cloudfront.net/2.9.70/images/icon-=
+social-fb-mini.png" alt=3D"Facebook" /></a>
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09=09<a href=3D"https://www.instagr=
+am.com/99freelas"><img width=3D"20" height=3D"20" style=3D"width: 20px; hei=
+ght: 20px;" src=3D"https://d1fuainj13qzhu.cloudfront.net/2.9.70/images/icon=
+-social-ig-mini.png" alt=3D"Instagram" /></a>
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09=09<a href=3D"http://www.linkedin=
+.com/company/5050773"><img width=3D"20" height=3D"20" style=3D"width: 20px;=
+ height: 20px;" src=3D"https://d1fuainj13qzhu.cloudfront.net/2.9.70/images/=
+icon-social-linkedin-mini.png" alt=3D"Linkedin" /></a>
+=09=09=09=09=09=09=09=09=09=09=09=09=09=09</p>
+=09=09=09=09=09=09=09=09=09=09=09=09=09</td>
+=09=09=09=09=09=09=09=09=09=09=09=09</tr>
+=09=09=09=09=09=09=09=09=09=09=09</tbody>
+=09=09=09=09=09=09=09=09=09=09</table>
+=09=09=09=09=09=09=09=09=09</td>
+=09=09=09=09=09=09=09=09</tr>
+=09=09=09=09=09=09</tbody>
+=09=09=09=09=09</table>
+=09=09=09=09</td>
+=09=09=09</tr>
+=09=09</table>
+
+=09=09<img style=3D"display: none;" src=3D"https://www.99freelas.com.br/ema=
+il/read?token=3Dafc75bc8-2c36-471d-a4f8-d27ab35bea6b" />
+=09</body>
+</html>

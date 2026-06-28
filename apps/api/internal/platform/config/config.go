@@ -49,16 +49,33 @@ type Config struct {
 
 	OtelService  string
 	OtelEndpoint string
+
+	// Intake (optional): IMAP polling of a freelance-feed inbox (99Freelas
+	// digests). Active only when username+password are set; the password is a
+	// Gmail App Password, never the plain account password.
+	IntakeIMAPHost     string
+	IntakeIMAPPort     int
+	IntakeIMAPUsername string
+	IntakeIMAPPassword string
+	IntakeIMAPMailbox  string
+	IntakeIMAPFrom     string
+	IntakePollInterval time.Duration
+	IntakeMinScore     int
 }
 
 // IsProd reports whether the app runs in production mode.
 func (c Config) IsProd() bool { return c.AppEnv == "production" }
 
+// IntakeEnabled reports whether IMAP polling of the freelance feed is configured.
+func (c Config) IntakeEnabled() bool {
+	return c.IntakeIMAPUsername != "" && c.IntakeIMAPPassword != ""
+}
+
 // Load reads and validates configuration from the environment.
 func Load() (Config, error) {
 	c := Config{
-		AppEnv:   env("APP_ENV", "development"),
-		HTTPAddr: httpAddr(),
+		AppEnv:          env("APP_ENV", "development"),
+		HTTPAddr:        httpAddr(),
 		WebOrigin:       env("WEB_ORIGIN", "http://localhost:5173"),
 		DatabaseURL:     env("DATABASE_URL", "file:./data/mirante.db"),
 		DatabaseToken:   env("DATABASE_AUTH_TOKEN", ""),
@@ -128,6 +145,30 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("invalid PASSWORD_RESET_TTL: %w", err)
 	}
 	c.PasswordResetTTL = resetTTL
+
+	c.IntakeIMAPHost = env("INTAKE_IMAP_HOST", "imap.gmail.com")
+	c.IntakeIMAPUsername = env("INTAKE_IMAP_USERNAME", "")
+	c.IntakeIMAPPassword = env("INTAKE_IMAP_PASSWORD", "")
+	c.IntakeIMAPMailbox = env("INTAKE_IMAP_MAILBOX", "INBOX")
+	c.IntakeIMAPFrom = env("INTAKE_IMAP_FROM", "99freelas.com.br")
+
+	imapPort, err := atoi(env("INTAKE_IMAP_PORT", "993"))
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid INTAKE_IMAP_PORT: %w", err)
+	}
+	c.IntakeIMAPPort = imapPort
+
+	pollInterval, err := time.ParseDuration(env("INTAKE_POLL_INTERVAL", "15m"))
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid INTAKE_POLL_INTERVAL: %w", err)
+	}
+	c.IntakePollInterval = pollInterval
+
+	minScore, err := atoi(env("INTAKE_MIN_SCORE", "60"))
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid INTAKE_MIN_SCORE: %w", err)
+	}
+	c.IntakeMinScore = minScore
 
 	if c.IsProd() {
 		if c.SecretKey == "" {

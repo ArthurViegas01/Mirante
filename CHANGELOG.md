@@ -10,6 +10,29 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 ## [Não lançado]
 
 ### Adicionado
+- **Captação de propostas freelance (99Freelas).** Nova área **Propostas**
+  (`/propostas`): um poller IMAP lê os e-mails de novos projetos do 99Freelas
+  (read-only, `EXAMINE` + `BODY.PEEK` — nunca marca como lido nem apaga), parseia
+  cada projeto (título, categoria, nível, prazo, nº de propostas, skills e os links
+  *Ver projeto* / *Enviar proposta*) e o estaciona numa fila de triagem **ranqueada
+  por score** (aderência de skills + concorrência + frescor). Duplicados são
+  deduplicados pelo id do projeto; a fila permite **descartar**. Novo domínio
+  `internal/intake` (staging isolado por usuário, migração 0018), poller atrás de uma
+  interface `MessageSource` testável, itens atribuídos ao dono da caixa (e-mail =
+  `INTAKE_IMAP_USERNAME`), com fallback no admin. Configuração por env
+  `INTAKE_IMAP_*` / `INTAKE_POLL_INTERVAL` / `INTAKE_MIN_SCORE` — **dormente sem
+  credenciais**. O catálogo de skills ganhou termos de freela (Shopify, WordPress,
+  Pentaho, etc.). Geração da proposta e *promover → vaga + candidatura* ficam para
+  uma próxima fase.
+- **Importar projeto do GitHub.** No formulário de novo projeto, cole o link do
+  repositório e clique em **Buscar do GitHub** para pré-preencher nome, codinome,
+  descrição, URL do repo e tags (linguagem principal + topics); repositório
+  arquivado entra como `arquivado`. Novo endpoint `POST /api/projects/import`
+  busca os metadados na API do GitHub pelo fetcher com guarda anti-SSRF
+  ([ADR-0003](docs/adr/0003-two-trust-domain-fetch.md), IPs privados bloqueados) e
+  devolve um rascunho **não persistido** — o usuário revisa e salva. Aceita as
+  formas usuais de link (`https`, com/sem `.git`, caminhos mais profundos e SSH
+  `git@github.com:…`). Espelha o import de link de vaga (F3).
 - **Multiusuário.** O Mirante deixa de ser single-user: cada usuário tem seu
   próprio Mirante privado, no mesmo deploy de instância única ([ADR-0008](docs/adr/0008-multiusuario.md)).
   - **Isolamento por usuário.** Toda tabela de domínio ganha `user_id` (migrações
@@ -77,6 +100,19 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
   novos componentes.
 
 ### Corrigido
+- **Login caía de forma intermitente quando o Turso oscilava.** Com a borda do
+  Turso reciclando o stream da conexão ou respondendo `502 connect to upstream`,
+  a conexão única e perene da API "envenenava" e toda query — inclusive o login —
+  passava a falhar com `stream is closed: bad connection` até a conexão expirar
+  (o scheduler do monitor registrava o mesmo erro a cada 15s). No caminho remoto
+  (libSQL/Turso) a API agora usa um pool pequeno com `SetConnMaxLifetime` (5min),
+  reciclando os streams antes de o Turso derrubá-los; o SQLite local segue
+  single-writer. Erros transitórios de conectividade são classificados e repetidos
+  com backoff curto (`internal/platform/db`: `Retry`/`IsTransient`) no login
+  (leituras + criação de sessão), na autenticação por sessão e no `reconcile` do
+  monitor. `WithTx` repete apenas falhas **antes** do commit — um commit ambíguo
+  não é repetido, para não duplicar escritas não idempotentes (ex.: contadores de
+  rollup do compactador).
 - **As fontes não carregavam.** Os `.woff2` de Figtree, Instrument Serif e Geist
   Mono não estavam versionados, então todo o `@font-face` caía nas fontes do
   sistema e a tipografia do design system não era aplicada no app no ar. Os

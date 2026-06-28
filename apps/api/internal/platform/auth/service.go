@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lumni/mirante/internal/platform/db"
 	"github.com/lumni/mirante/internal/platform/id"
 	"github.com/lumni/mirante/internal/platform/ratelimit"
 )
@@ -136,7 +137,12 @@ func (s *Service) Login(ctx context.Context, email, password, userAgent, ip stri
 		return nil, "", ErrRateLimited
 	}
 
-	u, err := s.users.GetByEmail(ctx, email)
+	var u *User
+	err := db.Retry(ctx, func() error {
+		var e error
+		u, e = s.users.GetByEmail(ctx, email)
+		return e
+	})
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			return nil, "", ErrInvalidCredentials
@@ -177,7 +183,11 @@ func (s *Service) createSession(ctx context.Context, userID, userAgent, ip strin
 		IP:        ip,
 		ExpiresAt: time.Now().UTC().Add(s.ttl),
 	}
-	if err := s.sessions.Create(ctx, sess, hashToken(token)); err != nil {
+	// A transient failure before the INSERT runs is safe to retry: the row was not
+	// written, so the same session is re-inserted on a fresh connection.
+	if err := db.Retry(ctx, func() error {
+		return s.sessions.Create(ctx, sess, hashToken(token))
+	}); err != nil {
 		return nil, "", err
 	}
 	return sess, token, nil
@@ -188,15 +198,23 @@ func (s *Service) Authenticate(ctx context.Context, token string) (*User, *Sessi
 	if token == "" {
 		return nil, nil, ErrUnauthenticated
 	}
-	sess, err := s.sessions.GetByToken(ctx, hashToken(token))
-	if err != nil {
+	var sess *Session
+	if err := db.Retry(ctx, func() error {
+		var e error
+		sess, e = s.sessions.GetByToken(ctx, hashToken(token))
+		return e
+	}); err != nil {
 		return nil, nil, ErrUnauthenticated
 	}
 	if sess.RevokedAt != nil || time.Now().After(sess.ExpiresAt) {
 		return nil, nil, ErrUnauthenticated
 	}
-	u, err := s.users.GetByID(ctx, sess.UserID)
-	if err != nil {
+	var u *User
+	if err := db.Retry(ctx, func() error {
+		var e error
+		u, e = s.users.GetByID(ctx, sess.UserID)
+		return e
+	}); err != nil {
 		return nil, nil, ErrUnauthenticated
 	}
 	_ = s.sessions.Touch(ctx, sess.ID, time.Now().UTC())

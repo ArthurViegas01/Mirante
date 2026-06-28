@@ -18,6 +18,7 @@ func RegisterRoutes(mux *http.ServeMux, protect func(http.Handler) http.Handler,
 	h := &handlers{svc: svc}
 	mux.Handle("GET /api/projects", protect(http.HandlerFunc(h.list)))
 	mux.Handle("POST /api/projects", protect(http.HandlerFunc(h.create)))
+	mux.Handle("POST /api/projects/import", protect(http.HandlerFunc(h.importDraft)))
 	mux.Handle("GET /api/projects/{id}", protect(http.HandlerFunc(h.get)))
 	mux.Handle("PATCH /api/projects/{id}", protect(http.HandlerFunc(h.update)))
 	mux.Handle("DELETE /api/projects/{id}", protect(http.HandlerFunc(h.remove)))
@@ -46,6 +47,24 @@ func (h *handlers) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond.JSON(w, http.StatusCreated, p)
+}
+
+// importDraft fetches a GitHub repo and returns an unsaved project draft for the
+// UI to pre-fill the new-project form. Nothing is persisted.
+func (h *handlers) importDraft(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		URL string `json:"url"`
+	}
+	if err := respond.Decode(w, r, &in, maxBody); err != nil {
+		respond.Error(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	draft, err := h.svc.ImportDraft(r.Context(), in.URL)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	respond.JSON(w, http.StatusOK, draft)
 }
 
 func (h *handlers) get(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +127,10 @@ func writeErr(w http.ResponseWriter, err error) {
 		respond.Error(w, http.StatusNotFound, "not_found", "project not found")
 	case errors.Is(err, ErrInvalid):
 		respond.Error(w, http.StatusBadRequest, "validation_error", err.Error())
+	case errors.Is(err, ErrImportUnavailable):
+		respond.Error(w, http.StatusServiceUnavailable, "import_unavailable", "import do GitHub indisponível")
+	case errors.Is(err, ErrImportFailed):
+		respond.Error(w, http.StatusUnprocessableEntity, "import_failed", err.Error())
 	default:
 		respond.Error(w, http.StatusInternalServerError, "internal", "internal error")
 	}
