@@ -115,6 +115,35 @@ func (db *DB) runTx(ctx context.Context, fn func(*sql.Tx) error) (committed bool
 	return true, nil
 }
 
+// QueryContext shadows the embedded *sql.DB so every repo read gets connection
+// resilience for free: a libSQL stream the Turso edge recycled server-side
+// surfaces when the query is sent, and re-running a read on a fresh connection is
+// always safe. Without this, a transient "stream is closed" on a pooled idle
+// connection bubbles up as a 500 (the dashboard, which fires several reads at
+// once, is the worst hit). Errors that arise during row iteration after a
+// successful open are not retried, which is fine for the small result sets here.
+func (db *DB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	var rows *sql.Rows
+	err := Retry(ctx, func() error {
+		var qerr error
+		rows, qerr = db.DB.QueryContext(ctx, query, args...)
+		return qerr
+	})
+	return rows, err
+}
+
+// QueryRowContext mirrors QueryContext for single-row reads. It re-runs the query
+// on a transient failure and surfaces the chosen row via a closure so the retry
+// can re-issue it; the caller scans the returned row as usual.
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	var row *sql.Row
+	_ = Retry(ctx, func() error {
+		row = db.DB.QueryRowContext(ctx, query, args...)
+		return row.Err()
+	})
+	return row
+}
+
 // resolve maps a DATABASE_URL to a (driver, dsn) pair.
 func resolve(url, authToken string) (driver, dsn string, err error) {
 	switch {
