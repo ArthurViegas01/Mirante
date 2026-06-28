@@ -13,10 +13,13 @@
 	let tituloAlvo = $state('');
 	let contato = $state('');
 	let resumo = $state('');
-	let skillsText = $state('');
 	let savedSkills = $state([]);
 	let experiences = $state([]);
 	let education = $state([]);
+	// Identity is owned by Meu Perfil, so on save we re-fetch the latest identity
+	// instead of echoing this page's snapshot (avoids clobbering identity edited
+	// elsewhere). The exception is a CV import, which intentionally rewrites it.
+	let importedIdentity = $state(false);
 
 	let loading = $state(true);
 	let saving = $state(false);
@@ -38,7 +41,6 @@
 			contato = p.contato ?? '';
 			resumo = p.resumo ?? '';
 			savedSkills = p.skills ?? [];
-			skillsText = savedSkills.join(', ');
 			experiences = (p.experiences ?? []).map((e) => ({
 				empresa: e.empresa,
 				cargo: e.cargo,
@@ -73,7 +75,7 @@
 			tituloAlvo = d.titulo_alvo || tituloAlvo;
 			contato = d.contato || contato;
 			resumo = d.resumo || resumo;
-			if (d.skills?.length) skillsText = d.skills.join(', ');
+			if (d.skills?.length) savedSkills = d.skills;
 			if (d.experiences?.length) {
 				experiences = d.experiences.map((e) => ({
 					empresa: e.empresa,
@@ -92,6 +94,7 @@
 				}));
 			}
 			importText = '';
+			importedIdentity = true;
 			toasts.success('CV estruturado pela IA');
 		} catch (e) {
 			importError = e.message;
@@ -108,16 +111,34 @@
 	const removeEducation = (i) => education.splice(i, 1);
 
 	async function persist() {
-		const skills = skillsText
-			.split(',')
-			.map((s) => s.trim())
-			.filter(Boolean);
+		// PUT /api/cv is a full replace, but identity lives in Meu Perfil. Unless an
+		// import just rewrote it on purpose, re-fetch the freshest identity right
+		// before saving so this page never overwrites identity with a stale snapshot
+		// (e.g. edited in Meu Perfil in another tab). We only own experiences/education.
+		let id = { nome, titulo, titulo_alvo: tituloAlvo, contato, resumo, skills: savedSkills };
+		if (!importedIdentity) {
+			const fresh = await api('/api/profile');
+			id = {
+				nome: fresh.nome ?? '',
+				titulo: fresh.titulo ?? '',
+				titulo_alvo: fresh.titulo_alvo ?? '',
+				contato: fresh.contato ?? '',
+				resumo: fresh.resumo ?? '',
+				skills: fresh.skills ?? []
+			};
+		}
 		const p = await api('/api/cv', {
 			method: 'PUT',
-			body: { nome, titulo, titulo_alvo: tituloAlvo, contato, resumo, skills, experiences, education }
+			body: { ...id, experiences, education }
 		});
+		// Reflect the persisted identity in the read-only display and reset the flag.
+		nome = p.nome ?? '';
+		titulo = p.titulo ?? '';
+		tituloAlvo = p.titulo_alvo ?? '';
+		contato = p.contato ?? '';
+		resumo = p.resumo ?? '';
 		savedSkills = p.skills ?? [];
-		skillsText = savedSkills.join(', ');
+		importedIdentity = false;
 		return p;
 	}
 
@@ -169,7 +190,6 @@
 
 <header class="page-head">
 	<div>
-		<p class="eyebrow">CV</p>
 		<h1>CV mestre</h1>
 	</div>
 </header>
@@ -208,31 +228,25 @@
 
 	<form onsubmit={save}>
 		<section class="panel">
-			<h2>Identidade</h2>
-			<div class="grid">
-				<Input label="Nome" bind:value={nome} />
-				<Input label="Profissão atual" bind:value={titulo} placeholder="Dev Backend Pleno" />
-				<Input label="Profissão almejada" bind:value={tituloAlvo} placeholder="Staff Engineer" />
+			<div class="panel-head">
+				<h2>Identidade</h2>
+				<a class="edit-link" href="/perfil">Editar em Meu Perfil →</a>
 			</div>
-			<Input
-				label="Contato (e-mail · telefone · localização · links)"
-				bind:value={contato}
-				placeholder="arthur@email.com · +55 51 … · Porto Alegre · github.com/…"
-			/>
-			<Textarea
-				label="Resumo profissional"
-				bind:value={resumo}
-				rows={4}
-				placeholder="Um parágrafo sobre você, sua stack e o que busca."
-			/>
-			<label class="field">
-				<span class="label">Skills (vírgula): base do <strong>% de aderência</strong> das vagas</span>
-				<Input bind:value={skillsText} placeholder="Go, React, PostgreSQL, Docker…" />
-			</label>
-			{#if savedSkills.length}
-				<div class="skills">
-					{#each savedSkills as s (s)}<span class="skill">{s}</span>{/each}
-				</div>
+			{#if nome || titulo || tituloAlvo || contato || resumo || savedSkills.length}
+				<dl class="id-list">
+					{#if nome}<div><dt>Nome</dt><dd>{nome}</dd></div>{/if}
+					{#if titulo}<div><dt>Profissão atual</dt><dd>{titulo}</dd></div>{/if}
+					{#if tituloAlvo}<div><dt>Profissão almejada</dt><dd>{tituloAlvo}</dd></div>{/if}
+					{#if contato}<div><dt>Contato</dt><dd>{contato}</dd></div>{/if}
+					{#if resumo}<div class="wide"><dt>Resumo</dt><dd>{resumo}</dd></div>{/if}
+				</dl>
+				{#if savedSkills.length}
+					<div class="skills">
+						{#each savedSkills as s (s)}<span class="skill">{s}</span>{/each}
+					</div>
+				{/if}
+			{:else}
+				<p class="muted">Ainda sem identidade. <a href="/perfil">Preencha em Meu Perfil</a>.</p>
 			{/if}
 		</section>
 
@@ -306,14 +320,6 @@
 	.page-head {
 		margin-bottom: var(--space-6);
 	}
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		letter-spacing: var(--tracking-eyebrow);
-		text-transform: uppercase;
-		color: var(--color-text-muted);
-		margin: 0 0 var(--space-2);
-	}
 	h1 {
 		font-size: var(--text-2xl);
 		font-weight: var(--weight-medium);
@@ -357,15 +363,49 @@
 		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 		gap: var(--space-4);
 	}
-	.field {
+	.edit-link {
+		font-size: var(--text-sm);
+		color: var(--color-link);
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	.edit-link:hover {
+		text-decoration: underline;
+	}
+	.id-list {
+		margin: 0;
 		display: flex;
 		flex-direction: column;
+		gap: var(--space-3);
+	}
+	.id-list > div {
+		display: grid;
+		grid-template-columns: 150px 1fr;
+		gap: var(--space-3);
+	}
+	.id-list .wide {
+		grid-template-columns: 1fr;
 		gap: var(--space-1);
 	}
-	.label {
-		font-size: 11.5px;
+	.id-list dt {
+		margin: 0;
+		padding-top: 2px;
+		font-size: 11px;
 		font-weight: var(--weight-medium);
-		color: var(--color-text-secondary);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--color-text-muted);
+	}
+	.id-list dd {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--color-text);
+	}
+	@media (max-width: 520px) {
+		.id-list > div {
+			grid-template-columns: 1fr;
+			gap: var(--space-1);
+		}
 	}
 	.sk-panel {
 		gap: var(--space-3);

@@ -47,8 +47,9 @@
 		'/projetos': 'Projetos',
 		'/tarefas': 'Tarefas',
 		'/custos': 'Custos',
+		'/perfil': 'Meu Perfil',
 		'/vagas': 'Vagas',
-		'/cv': 'CV',
+		'/cv': 'Currículo',
 		'/candidaturas': 'Candidaturas'
 	};
 	let pageTitle = $derived(
@@ -160,6 +161,8 @@
 		display: grid;
 		grid-template-columns: var(--sidebar-width) 1fr;
 		min-height: 100dvh;
+		/* Animate the rail collapse/expand (snaps where unsupported). */
+		transition: grid-template-columns var(--collapse-dur) var(--ease-out);
 	}
 	.main {
 		display: flex;
@@ -222,8 +225,7 @@
 	}
 	.content {
 		flex: 1;
-		padding: var(--space-8) var(--space-6);
-		max-width: var(--max-canvas);
+		padding: var(--space-4) var(--space-6);
 		width: 100%;
 	}
 	.boot {

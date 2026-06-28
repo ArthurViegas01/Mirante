@@ -51,7 +51,6 @@
 		<span class="avatar" aria-hidden="true">{session.initials}</span>
 		<span class="who">
 			<span class="name">{session.displayName}</span>
-			<span class="org">by Lumni</span>
 		</span>
 		<svg class="chev" class:up={open} viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			<path d="m6 9 6 6 6-6" />
@@ -140,11 +139,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	.who .org {
-		font-family: var(--font-mono);
-		font-size: 10.5px;
-		color: rgba(255, 255, 255, 0.4);
-	}
 	.chev {
 		color: rgba(255, 255, 255, 0.5);
 		flex-shrink: 0;
@@ -152,6 +146,37 @@
 	}
 	.chev.up {
 		transform: rotate(180deg);
+	}
+
+	/* Collapsed rail (desktop): avatar only, and the dropdown opens to the side
+	   as a flyout instead of upward. Driven by the <html> attribute. */
+	@media (min-width: 721px) {
+		:global(html[data-sidebar='collapsed']) .trigger {
+			justify-content: center;
+			padding: 8px 0;
+		}
+		/* Keep the name as the trigger's accessible name (avatar + chevron are
+		   aria-hidden), so hide it visually rather than with display:none. */
+		:global(html[data-sidebar='collapsed']) .who {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			padding: 0;
+			margin: -1px;
+			overflow: hidden;
+			clip: rect(0, 0, 0, 0);
+			white-space: nowrap;
+			border: 0;
+		}
+		:global(html[data-sidebar='collapsed']) .chev {
+			display: none;
+		}
+		:global(html[data-sidebar='collapsed']) .menu {
+			left: calc(100% + 12px);
+			right: auto;
+			bottom: 0;
+			min-width: 220px;
+		}
 	}
 
 	.menu {

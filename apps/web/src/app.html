@@ -13,6 +13,11 @@
 				else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
 					document.documentElement.dataset.theme = 'dark';
 			} catch (e) {}
+			// Same flash-guard for the collapsed (icon-rail) sidebar state.
+			try {
+				if (localStorage.getItem('sidebar-collapsed') === '1')
+					document.documentElement.dataset.sidebar = 'collapsed';
+			} catch (e) {}
 		</script>
 		%sveltekit.head%
 	</head>

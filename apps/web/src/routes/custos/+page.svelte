@@ -52,7 +52,6 @@
 
 <header class="page-head">
 	<div>
-		<p class="eyebrow">Custos</p>
 		<h1>Assinaturas</h1>
 	</div>
 	{#if !loading && subscriptions.length}
@@ -125,14 +124,6 @@
 		justify-content: space-between;
 		gap: var(--space-4);
 		margin-bottom: var(--space-6);
-	}
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		letter-spacing: var(--tracking-eyebrow);
-		text-transform: uppercase;
-		color: var(--color-text-muted);
-		margin: 0 0 var(--space-2);
 	}
 	h1 {
 		font-size: var(--text-2xl);

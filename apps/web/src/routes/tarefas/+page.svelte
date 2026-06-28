@@ -145,7 +145,6 @@
 
 <header class="page-head">
 	<div>
-		<p class="eyebrow">Tarefas</p>
 		<h1>Quadro</h1>
 	</div>
 	<div class="head-actions">
@@ -273,14 +272,6 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
-	}
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		letter-spacing: var(--tracking-eyebrow);
-		text-transform: uppercase;
-		color: var(--color-text-muted);
-		margin: 0 0 var(--space-2);
 	}
 	h1 {
 		font-size: var(--text-2xl);

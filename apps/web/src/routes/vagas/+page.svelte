@@ -5,7 +5,6 @@
 	import Textarea from '$lib/components/Textarea.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
-	import ProfileHeadline from '$lib/components/ProfileHeadline.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { api } from '$lib/api.js';
@@ -188,11 +187,6 @@
 </script>
 
 <header class="page-head">
-	<div>
-		<p class="eyebrow">Vagas</p>
-		<h1>Vagas</h1>
-		<ProfileHeadline />
-	</div>
 	<Button onclick={() => (showForm ? (showForm = false) : (showForm = true))}>
 		{showForm ? 'Cancelar' : 'Nova vaga'}
 	</Button>
@@ -349,25 +343,8 @@
 <style>
 	.page-head {
 		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: var(--space-4);
+		justify-content: flex-end;
 		margin-bottom: var(--space-6);
-	}
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		letter-spacing: var(--tracking-eyebrow);
-		text-transform: uppercase;
-		color: var(--color-text-muted);
-		margin: 0 0 var(--space-2);
-	}
-	h1 {
-		font-size: var(--text-2xl);
-		font-weight: var(--weight-medium);
-		letter-spacing: var(--tracking-snug);
-		color: var(--color-text);
-		margin: 0;
 	}
 	.muted {
 		color: var(--color-text-secondary);

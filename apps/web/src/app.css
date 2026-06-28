@@ -219,6 +219,8 @@
   --dur-fast:    160ms;
   --dur-base:    240ms;
   --dur-slow:    400ms;
+  /* Sidebar collapse/expand: a touch slower than --dur-slow for a smoother feel. */
+  --collapse-dur: 800ms;
 
   /* ---------- LAYOUT ---------- */
   --max-content: 1200px;
@@ -232,6 +234,13 @@
   color-scheme: light;
 }
 
+/* Collapsed desktop sidebar: narrow icon rail. Set pre-paint by the inline
+   script in app.html (mirrors the theme flash-guard) and toggled at runtime by
+   Sidebar.svelte. Ignored on mobile, where the grid collapses to one column. */
+html[data-sidebar="collapsed"] {
+  --sidebar-width: 72px;
+}
+
 /* ============================================================
    DARK THEME — role tokens flip; ramps/scale stay constant
    ============================================================ */
@@ -242,7 +251,7 @@
   --color-surface-sunken:   #0D1825; /* between ink-950/900: recessed panels, subtle hovers */
   --color-border:           rgba(255,255,255,0.08);
   --color-border-strong:    var(--ink-700);
-  --color-divider:          rgba(255,255,255,0.05);
+  --color-divider:          rgba(76, 173, 144, 0.596);
   --color-text:             var(--ink-50);
   --color-text-secondary:   rgba(255,255,255,0.72);
   --color-text-muted:       var(--ink-400);

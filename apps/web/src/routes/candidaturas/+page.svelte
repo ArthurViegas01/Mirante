@@ -104,7 +104,6 @@
 
 <header class="page-head">
 	<div>
-		<p class="eyebrow">Candidaturas</p>
 		<h1>Pipeline</h1>
 	</div>
 </header>
@@ -217,14 +216,6 @@
 <style>
 	.page-head {
 		margin-bottom: var(--space-6);
-	}
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		letter-spacing: var(--tracking-eyebrow);
-		text-transform: uppercase;
-		color: var(--color-text-muted);
-		margin: 0 0 var(--space-2);
 	}
 	h1 {
 		font-size: var(--text-2xl);
