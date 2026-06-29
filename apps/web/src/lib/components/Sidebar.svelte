@@ -110,23 +110,44 @@
 
 <nav class="sidebar" class:open aria-label="Navegação principal">
 	<div class="brand">
-		<BrandMark tag="by lumni" pulse />
-		<button
-			class="rail-toggle"
-			onclick={toggleCollapse}
-			aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
-			aria-expanded={!collapsed}
-			title={collapsed ? 'Expandir' : 'Recolher'}
-		>
-			<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-				<path d="m15 18-6-6 6-6" />
-			</svg>
-		</button>
-		<button class="close-drawer" onclick={() => (open = false)} aria-label="Fechar menu">
-			<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-				<path d="M18 6 6 18M6 6l12 12" />
-			</svg>
-		</button>
+		<!-- Expanded layout: lockup on the left, collapse toggle on the right. -->
+		<div class="brand-layer brand-full" aria-hidden={collapsed}>
+			<BrandMark tag="by lumni" pulse />
+			<button
+				class="rail-toggle"
+				onclick={toggleCollapse}
+				aria-label="Recolher menu"
+				aria-expanded="true"
+				title="Recolher"
+				tabindex={collapsed ? -1 : 0}
+			>
+				<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<path d="m15 18-6-6 6-6" />
+				</svg>
+			</button>
+			<button class="close-drawer" onclick={() => (open = false)} aria-label="Fechar menu">
+				<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<path d="M18 6 6 18M6 6l12 12" />
+				</svg>
+			</button>
+		</div>
+		<!-- Collapsed layout: mark on top, expand toggle below, centered. The two
+		     layers cross-fade so the row->column change reads as a dissolve, not a jump. -->
+		<div class="brand-layer brand-mini" aria-hidden={!collapsed}>
+			<BrandMark wordmark={false} pulse />
+			<button
+				class="rail-toggle"
+				onclick={toggleCollapse}
+				aria-label="Expandir menu"
+				aria-expanded="false"
+				title="Expandir"
+				tabindex={collapsed ? 0 : -1}
+			>
+				<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<path d="m9 18 6-6-6-6" />
+				</svg>
+			</button>
+		</div>
 	</div>
 
 	<!-- Áreas de navegação: Projetos e Perfil. -->
@@ -199,24 +220,41 @@
 	}
 
 	.brand {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 7px;
-		/* The brand spans the full rail-top → divider band (67px = topbar height),
-		   so its centered content has equal space above and below. The negative top
-		   margin pulls it up over the sidebar's 18px top padding; the divider (bottom
-		   border) still lands at 67px, lined up with the topbar's bottom border. */
+		/* Positioning context for the two cross-fading layers. Spans the full
+		   rail-top → divider band (67px = topbar height); the negative top margin
+		   pulls it up over the sidebar's 18px top padding so the divider (bottom
+		   border) lands at 67px, lined up with the topbar's bottom border. */
+		position: relative;
 		height: 67px;
-		/* Negative margins reach the rail edges: 14px on the sides (sidebar side
-		   padding) and 18px on top (sidebar top padding). */
 		margin: -18px -14px 12px;
-		padding: 0 20px;
 		border-bottom: var(--border-width-1) solid rgba(255, 255, 255, 0.09);
 		color: #ffffff;
 		--mark-fill: var(--glow);
 		--word-size: 20px;
 		--tag-color: rgba(255, 255, 255, 0.4);
+	}
+	/* Two stacked brand layouts that cross-fade between expanded and collapsed, so
+	   the row->column change reads as a dissolve instead of a hard restack. */
+	.brand-layer {
+		position: absolute;
+		inset: 0;
+		transition: opacity var(--collapse-dur) var(--ease-out);
+	}
+	.brand-full {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 20px;
+		opacity: 1;
+	}
+	.brand-mini {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		opacity: 0;
+		pointer-events: none;
 	}
 	/* Collapse/expand control. Chevron points left to collapse; CSS rotates it to
 	   point right when the rail is collapsed. */
@@ -354,22 +392,15 @@
 	   so it is correct on first paint. Mobile keeps the full drawer.
 	   ============================================================ */
 	@media (min-width: 721px) {
-		/* Brand stacks: mark on top, toggle below, both centered. */
-		:global(html[data-sidebar='collapsed']) .brand {
-			flex-direction: column;
-			align-items: center;
-			justify-content: center;
-			height: auto;
-			/* Keep the top breathing room here (the expanded brand's -18px pull-up
-			   would otherwise glue the mark to the rail's top edge). */
-			margin-top: 0;
-			gap: 12px;
-			padding: 0 0 14px;
+		/* Cross-fade the two brand layouts: expanded out, collapsed (centered mark +
+		   toggle) in. Pure opacity, so there is no row->column jump. */
+		:global(html[data-sidebar='collapsed']) .brand-full {
+			opacity: 0;
+			pointer-events: none;
 		}
-		/* Hide the whole word/tag stack (not just its text) so the lockup is just
-		   the mark and centers exactly in the rail. */
-		:global(html[data-sidebar='collapsed'] .brand .word-stack) {
-			display: none;
+		:global(html[data-sidebar='collapsed']) .brand-mini {
+			opacity: 1;
+			pointer-events: auto;
 		}
 		/* Fade the labels but keep their box, so the empty space turns into a
 		   subtle separator between the icon groups. */
@@ -435,10 +466,6 @@
 		:global(html[data-sidebar='collapsed']) .nav a:focus-visible::after,
 		:global(html[data-sidebar='collapsed']) .nav a:focus-visible::before {
 			opacity: 1;
-		}
-		/* Flip the chevron to point right (expand). */
-		:global(html[data-sidebar='collapsed']) .rail-toggle svg {
-			transform: rotate(180deg);
 		}
 	}
 
