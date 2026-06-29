@@ -54,8 +54,8 @@ Tecnologias deliberadamente novas (regra de aprendizado do projeto).
 - **Migrações:** goose (embarcadas no binário via `go:embed`).
 - **Validação:** go-playground/validator. **Testes:** Go testing + testify +
   testcontainers-go. **Lint:** golangci-lint.
-- **Observabilidade:** OpenTelemetry. **Deploy:** Fly.io (single machine).
-  **Dev:** Docker Compose.
+- **Observabilidade:** OpenTelemetry. **Deploy:** Railway (réplica única; Fly.io
+  alternativo). **Dev:** Docker Compose.
 
 ## Design
 
@@ -130,11 +130,14 @@ docker compose up --build       # sobe libSQL (sqld) + API + web (dev)
 # login de dev (admin): owner@example.com / change-me-dev  (definido no compose)
 ```
 
-Em produção (sem `OWNER_EMAIL`) a instância sobe **sem conta**: o **primeiro
-cadastro pela UI** vira o **admin** e já entra. Cadastros seguintes nascem
-**pendentes** e só logam depois que o admin os ativa em **Usuários**
-(`/admin/usuarios`). Para testar o primeiro acesso localmente, comente
-`OWNER_EMAIL`/`OWNER_PASSWORD` no `docker-compose.yml` e zere o volume
+Em **produção**, semeie o dono no primeiro deploy: gere o hash com
+`go run ./cmd/hashpw` e configure `OWNER_EMAIL` + `OWNER_PASSWORD_HASH` (Argon2id)
+**antes** de subir — assim o admin nasce no boot e o cadastro público já fecha,
+evitando que um terceiro reivindique a instância no primeiro signup (F3).
+Cadastros seguintes nascem **pendentes** e só logam depois que o admin os ativa em
+**Usuários** (`/admin/usuarios`). Se subir **sem** `OWNER_EMAIL` (apenas fora de
+produção), o **primeiro cadastro pela UI** vira o admin. Para testar localmente,
+comente `OWNER_EMAIL`/`OWNER_PASSWORD` no `docker-compose.yml` e zere o volume
 (`docker compose down -v`).
 
 Esqueceu a senha? A tela **"Esqueci minha senha"** (`/forgot-password`) envia um
@@ -164,33 +167,39 @@ make web-build    # build de produção do SvelteKit
 > Copie `.env.example` para `.env` para rodar a API fora do compose. Nenhum segredo
 > é versionado.
 
-## Deploy (Fly.io)
+## Deploy (Railway)
 
-Guia completo passo a passo em **[docs/DEPLOY.md](docs/DEPLOY.md)**. Resumo:
+Guia completo em **[docs/DEPLOY.md](docs/DEPLOY.md)**. Produção roda no **Railway**
+(API + web, deploy por push). **Uma única réplica** — o hub SSE, o scheduler do
+Monitor e o compactor de rollups são in-process e pressupõem um só writer
+(ADR-0002); não habilite réplicas > 1. O banco é **Turso/libSQL** hospedado.
 
-A API tem um [`apps/api/fly.toml`](apps/api/fly.toml) pronto. **Uma única máquina**
-(`fly scale count 1`) — o hub SSE, o scheduler do Monitor e o compactor de rollups
-são in-process e pressupõem um só writer (ADR-0002). O banco é **Turso/libSQL**
-hospedado; não há volume.
+No painel do Railway (Root Directory = `apps/api`), configure as variáveis:
 
 ```bash
-cd apps/api
-fly launch --no-deploy            # cria o app (ou ajuste app/region no fly.toml)
-fly secrets set DATABASE_URL=libsql://<db>.turso.io DATABASE_AUTH_TOKEN=... \
-  APP_SECRET_KEY="$(openssl rand -base64 32)" WEB_ORIGIN=https://<web-host>
-fly deploy && fly scale count 1
+# Secrets
+DATABASE_URL=libsql://<db>.turso.io   DATABASE_AUTH_TOKEN=...
+WEB_ORIGIN=https://<web-host>         GROQ_API_KEY=<opcional>
+OWNER_EMAIL=voce@exemplo.com          OWNER_PASSWORD_HASH=<go run ./cmd/hashpw>
+# Variables
+APP_ENV=production   TRUSTED_PROXY=true   MONITOR_RETENTION_DAYS=14
 ```
 
-O **admin** é criado no **primeiro cadastro (signup)** — sem `OWNER_*` em
-produção; cadastros seguintes ficam pendentes até o admin ativá-los. O frontend
-(SvelteKit, `adapter-node`) é publicado à parte (Fly, Vercel, etc.), apontando
-`API_URL`/`WEB_ORIGIN` para a API.
+Semeie `OWNER_EMAIL` + `OWNER_PASSWORD_HASH` **antes do primeiro deploy** para
+fechar a janela de "primeiro signup vira admin" (F3). `TRUSTED_PROXY=true` deixa o
+rate-limit por IP enxergar o IP real do cliente atrás do edge do Railway.
+Cadastros seguintes ficam pendentes até o admin ativá-los. O frontend (SvelteKit,
+`adapter-node`) é publicado à parte apontando `API_URL`/`WEB_ORIGIN` para a API.
+Alternativa de deploy em **Fly.io**: [`apps/api/fly.toml`](apps/api/fly.toml)
+(legado).
 
 ## Segurança
 
 Segredos só via env; CORS restrito; headers de segurança; validação/sanitização
-de toda entrada (inclusive links de vaga); credenciais nunca em texto puro
-(cifradas em repouso); contêineres non-root. Ver a seção de riscos no plano.
+de toda entrada (inclusive links de vaga, com IP pinning anti DNS-rebind);
+senhas e tokens de sessão guardados só como hash (Argon2id / SHA-256), nunca em
+texto puro; rate-limit por IP atrás de proxy confiável; contêineres non-root. Ver
+o plano em [`SECURITY_PLAN.md`](SECURITY_PLAN.md).
 
 ## Licença
 

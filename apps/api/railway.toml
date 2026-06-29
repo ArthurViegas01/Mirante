@@ -4,14 +4,20 @@
 # Variables to set in the Railway dashboard (Secrets tab):
 #   DATABASE_URL         libsql://mirante-prod-<org>.turso.io
 #   DATABASE_AUTH_TOKEN  <turso token>
-#   APP_SECRET_KEY       <random base64-32>
 #   WEB_ORIGIN           https://<mirante-web>.up.railway.app
 #   GROQ_API_KEY         <optional, for AI features>
+#   OWNER_EMAIL          you@example.com          # seed the owner at boot (F3)
+#   OWNER_PASSWORD_HASH  <go run ./cmd/hashpw>    # Argon2id; closes the first-signup claim
 #
 # Variables to set in the Railway dashboard (Variables tab, non-secret):
 #   APP_ENV                 production
 #   OTEL_SERVICE_NAME       mirante-api
 #   MONITOR_RETENTION_DAYS  14
+#   TRUSTED_PROXY           true   # behind Railway's edge; lets per-IP rate limits
+#                                  # read the real client IP (X-Envoy-External-Address)
+#
+# Seed OWNER_EMAIL + OWNER_PASSWORD_HASH BEFORE the first deploy so the owner is
+# created at boot and the public signup never opens for an attacker to claim (F3).
 #
 # The API listens on $PORT injected by Railway (see config.go httpAddr()).
 # Do NOT enable replicas > 1: SSE hub and scheduler are in-process (ADR-0002).

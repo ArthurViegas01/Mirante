@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -40,4 +41,28 @@ func TestWindowExpiry(t *testing.T) {
 
 	now = now.Add(2 * time.Minute)
 	require.True(t, l.Allow("k"), "window should have reset")
+}
+
+func TestCardinalityCapBoundsMap(t *testing.T) {
+	l := New(10, time.Minute)
+	l.maxKeys = 50
+	now := time.Now()
+	l.now = func() time.Time { return now }
+
+	// Fill the map to its cap with distinct, still-live keys.
+	for i := 0; i < l.maxKeys; i++ {
+		require.True(t, l.Allow(fmt.Sprintf("k%d", i)))
+	}
+	require.Len(t, l.hits, l.maxKeys)
+
+	// Far more distinct keys arrive: the map stays bounded (eviction makes room),
+	// and a legitimate new key is still admitted (never locked out).
+	for i := 0; i < 10*l.maxKeys; i++ {
+		require.True(t, l.Allow(fmt.Sprintf("flood%d", i)), "new keys must still be admitted")
+		require.LessOrEqual(t, len(l.hits), l.maxKeys, "map must never exceed the cap")
+	}
+
+	// An already-tracked, still-live key keeps its counter and limit.
+	l.hits["sticky"] = &counter{count: l.max, resetAt: now.Add(time.Minute)}
+	require.False(t, l.Allow("sticky"), "a key at its limit is still throttled")
 }

@@ -9,6 +9,38 @@ Este arquivo é a **fonte de verdade do histórico** do Mirante.
 
 ## [Não lançado]
 
+### Segurança
+- **Hardening do backend** (auditoria de segurança; ver [docs/SECURITY.md](docs/SECURITY.md)).
+  Todas as correções verificadas com build/test em container e revisão adversarial:
+  - **Anti DNS-rebind no fetcher externo** ([ADR-0003](docs/adr/0003-two-trust-domain-fetch.md)):
+    a validação de IP passou para dentro do `DialContext`, então o IP validado é
+    exatamente o discado (resolução única, sem janela TOCTOU). Faixas CGNAT
+    (`100.64.0.0/10`) e NAT64 (`64:ff9b::/96`) também bloqueadas; `Timeout` no
+    client; resolver injetável + testes de rebind (`httpx_test.go`).
+  - **Owner semeável no deploy.** Novo utilitário `cmd/hashpw` gera o
+    `OWNER_PASSWORD_HASH` (Argon2id) offline; semear `OWNER_EMAIL` +
+    `OWNER_PASSWORD_HASH` antes do 1º deploy fecha a janela de "primeiro signup vira
+    admin". Rate-limit dedicado de signup (5/h por IP, `429`).
+  - **IP real atrás de proxy confiável.** A confiança no header de IP do edge agora
+    é condicionada a `TRUSTED_PROXY` (default `false`); em produção lê
+    `X-Envoy-External-Address` (Railway). Sem isso, uma API exposta direto poderia
+    ter o header forjado para furar o rate-limit por IP. Aviso no boot se prod sem
+    a flag.
+  - **Limites de recurso.** `ReadTimeout`/`IdleTimeout` no `http.Server` (slow-body
+    e keep-alive ocioso; `WriteTimeout` omitido pelo SSE) e teto de cardinalidade no
+    rate-limiter (memória limitada sob chaves atacante-controladas, evicção do mais
+    próximo de expirar).
+  - **Login constant-time.** Verify Argon2id "dummy" para e-mail inexistente,
+    fechando o oracle de tempo de enumeração de usuário.
+  - **Caps de tamanho em vagas.** Campos (incluindo a saída do LLM no enrich) são
+    limitados antes de persistir.
+
+### Removido
+- **`APP_SECRET_KEY`.** A variável (anunciada como KEK para cifrar segredos em
+  repouso, mas nunca usada por nenhum código) foi removida de `config.go`, dos
+  `.env*` e dos docs de deploy: não havia cifragem em repouso implementada, então
+  ela só forçava um segredo inútil no boot de produção.
+
 ### Adicionado
 - **Captação de propostas freelance (99Freelas).** Nova área **Propostas**
   (`/propostas`): um poller IMAP lê os e-mails de novos projetos do 99Freelas

@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"runtime/debug"
+	"strings"
 
 	"github.com/lumni/mirante/internal/platform/id"
 	"github.com/lumni/mirante/internal/platform/ratelimit"
@@ -96,11 +97,12 @@ func CORS(allowedOrigin string) Middleware {
 	}
 }
 
-// RateLimit throttles requests per client IP.
-func RateLimit(l *ratelimit.Limiter) Middleware {
+// RateLimit throttles requests per client IP. trustedHeader is the proxy header
+// to read the real client IP from (empty = ignore proxy headers; see clientIP).
+func RateLimit(l *ratelimit.Limiter, trustedHeader string) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !l.Allow(clientIP(r)) {
+			if !l.Allow(clientIP(r, trustedHeader)) {
 				writeError(w, http.StatusTooManyRequests, "rate_limited", "too many requests")
 				return
 			}
@@ -109,11 +111,26 @@ func RateLimit(l *ratelimit.Limiter) Middleware {
 	}
 }
 
-// clientIP returns the best-effort client IP. Behind Fly the proxy sets
-// Fly-Client-IP; otherwise fall back to the connection's remote address.
-func clientIP(r *http.Request) string {
-	if fly := r.Header.Get("Fly-Client-IP"); fly != "" {
-		return fly
+// clientIP returns the best-effort client IP. When trustedHeader is non-empty
+// (set only when a trusted proxy fronts the app, e.g. Railway/Fly), its value is
+// used; otherwise the header is ignored — a directly-exposed instance must not
+// trust a forgeable header (F4), so it falls back to the connection's remote
+// address. A trustedHeader value with multiple comma-separated entries is read
+// left-most; a stray :port is stripped.
+func clientIP(r *http.Request, trustedHeader string) string {
+	if trustedHeader != "" {
+		if v := r.Header.Get(trustedHeader); v != "" {
+			if i := strings.IndexByte(v, ','); i >= 0 {
+				v = v[:i]
+			}
+			v = strings.TrimSpace(v)
+			if host, _, err := net.SplitHostPort(v); err == nil {
+				v = host
+			}
+			if v != "" {
+				return v
+			}
+		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

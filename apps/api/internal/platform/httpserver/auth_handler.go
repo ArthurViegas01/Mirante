@@ -18,6 +18,10 @@ type AuthConfig struct {
 	CookieName    string
 	Secure        bool
 	AllowedOrigin string
+	// TrustedHeader is the proxy header to read the client IP from for session
+	// attribution and the signup limiter; empty when no trusted proxy fronts the
+	// app (see clientIP / F4).
+	TrustedHeader string
 }
 
 // AuthHandlers serves the auth routes and exposes auth middleware.
@@ -118,9 +122,11 @@ func (h *AuthHandlers) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess, token, err := h.svc.Signup(r.Context(), req.Email, req.Password, req.Name, r.UserAgent(), clientIP(r))
+	sess, token, err := h.svc.Signup(r.Context(), req.Email, req.Password, req.Name, r.UserAgent(), clientIP(r, h.cfg.TrustedHeader))
 	if err != nil {
 		switch {
+		case errors.Is(err, auth.ErrRateLimited):
+			writeError(w, http.StatusTooManyRequests, "rate_limited", "too many attempts, try again later")
 		case errors.Is(err, auth.ErrPendingApproval):
 			// Account created, but it must be activated by an admin before login.
 			writeJSON(w, http.StatusAccepted, map[string]any{"status": "pending"})
@@ -156,7 +162,7 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess, token, err := h.svc.Login(r.Context(), req.Email, req.Password, r.UserAgent(), clientIP(r))
+	sess, token, err := h.svc.Login(r.Context(), req.Email, req.Password, r.UserAgent(), clientIP(r, h.cfg.TrustedHeader))
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrRateLimited):

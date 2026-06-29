@@ -27,13 +27,21 @@ var (
 
 // Service ties the stores together with the login limiter.
 type Service struct {
-	db           *sql.DB
-	users        *UserStore
-	sessions     *SessionStore
-	resets       *PasswordResetStore
-	limiter      *ratelimit.Limiter
-	resetLimiter *ratelimit.Limiter
-	ttl          time.Duration
+	db            *sql.DB
+	users         *UserStore
+	sessions      *SessionStore
+	resets        *PasswordResetStore
+	limiter       *ratelimit.Limiter
+	resetLimiter  *ratelimit.Limiter
+	signupLimiter *ratelimit.Limiter
+	ttl           time.Duration
+
+	// dummyHash is a well-formed Argon2id hash verified against when a login email
+	// has no account, so the response time matches the real path and the owner's
+	// e-mail can't be told apart by timing (M3). It is produced by HashPassword, so
+	// it tracks the same defaultParams as every stored hash and the verify cost
+	// stays equal as long as those params are shared.
+	dummyHash string
 
 	// Password-reset delivery (wired via WithMailer). A nil mailer logs the link.
 	mailer       Mailer
@@ -43,15 +51,21 @@ type Service struct {
 
 // NewService builds the auth service. ttl is the absolute session lifetime.
 func NewService(db *sql.DB, ttl time.Duration) *Service {
+	// Precompute the constant-time dummy hash once (HashPassword only fails if the
+	// system CSPRNG fails, in which case the dummy verify degrades to a cheap
+	// no-op — acceptable for this timing-hardening measure).
+	dummy, _ := HashPassword("mirante-constant-time-placeholder")
 	return &Service{
-		db:           db,
-		users:        NewUserStore(db),
-		sessions:     NewSessionStore(db),
-		resets:       NewPasswordResetStore(db),
-		limiter:      ratelimit.New(5, 15*time.Minute),
-		resetLimiter: ratelimit.New(3, 15*time.Minute),
-		ttl:          ttl,
-		resetTTL:     time.Hour, // default; overridden by WithMailer
+		db:            db,
+		users:         NewUserStore(db),
+		sessions:      NewSessionStore(db),
+		resets:        NewPasswordResetStore(db),
+		limiter:       ratelimit.New(5, 15*time.Minute),
+		resetLimiter:  ratelimit.New(3, 15*time.Minute),
+		signupLimiter: ratelimit.New(5, time.Hour),
+		dummyHash:     dummy,
+		ttl:           ttl,
+		resetTTL:      time.Hour, // default; overridden by WithMailer
 	}
 }
 
@@ -114,6 +128,12 @@ func (s *Service) Signup(ctx context.Context, email, password, name, userAgent, 
 	if email == "" || password == "" {
 		return nil, "", ErrInvalidCredentials
 	}
+	// Dedicated per-IP cap on account creation (defense-in-depth against signup
+	// abuse; the takeover race itself is closed by seeding OWNER_* on deploy). The
+	// IP is only meaningful behind a trusted proxy (F4); empty IP is not throttled.
+	if ip != "" && !s.signupLimiter.Allow(ip) {
+		return nil, "", ErrRateLimited
+	}
 	hash, err := HashPassword(password)
 	if err != nil {
 		return nil, "", err
@@ -145,6 +165,9 @@ func (s *Service) Login(ctx context.Context, email, password, userAgent, ip stri
 	})
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
+			// Burn the same Argon2id cost as the real path so a missing account
+			// can't be distinguished from a wrong password by response time (M3).
+			_, _ = VerifyPassword(password, s.dummyHash)
 			return nil, "", ErrInvalidCredentials
 		}
 		return nil, "", err

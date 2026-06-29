@@ -84,6 +84,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*Job, error) {
 	if j.Modelo == "" {
 		j.Modelo = ModeloIndefinido
 	}
+	clampJobFields(j)
 	if err := validateJob(j); err != nil {
 		return nil, err
 	}
@@ -126,6 +127,7 @@ func (s *Service) Update(ctx context.Context, id ID, in UpdateInput) (*Job, erro
 	if in.Resumo != nil {
 		j.Resumo = strings.TrimSpace(*in.Resumo)
 	}
+	clampJobFields(j)
 	if err := validateJob(j); err != nil {
 		return nil, err
 	}
@@ -195,15 +197,30 @@ func (s *Service) Enrich(ctx context.Context, id ID) (*Job, error) {
 	if r := strings.TrimSpace(out.Resumo); r != "" {
 		j.Resumo = r
 	}
+	// The extracted fields are untrusted LLM output (F5): clamp before persisting
+	// so a long or adversarial response can't bloat the row.
+	clampJobFields(j)
 	if err := s.repo.Update(ctx, j); err != nil {
 		return nil, err
 	}
 	return s.repo.Get(ctx, id)
 }
 
+// Field length caps (in runes). They bound both user input and untrusted
+// LLM-extracted fields so a single row can't grow without limit (F5). The
+// secondary fields are clamped (clampJobFields) rather than rejected, so editing
+// a pre-existing over-long row never fails; only Titulo (required) is hard-checked.
+const (
+	maxTitulo      = 200
+	maxEmpresa     = 200
+	maxLocalizacao = 200
+	maxSenioridade = 60
+	maxResumo      = 600
+)
+
 func validateJob(j *Job) error {
-	if n := strings.TrimSpace(j.Titulo); n == "" || len([]rune(n)) > 200 {
-		return fmt.Errorf("%w: titulo é obrigatório (max 200)", ErrInvalid)
+	if n := strings.TrimSpace(j.Titulo); n == "" || len([]rune(n)) > maxTitulo {
+		return fmt.Errorf("%w: titulo é obrigatório (max %d)", ErrInvalid, maxTitulo)
 	}
 	if err := validate.Var(string(j.Modelo), "oneof=remoto hibrido presencial indefinido"); err != nil {
 		return fmt.Errorf("%w: modelo inválido", ErrInvalid)
@@ -214,6 +231,25 @@ func validateJob(j *Job) error {
 		}
 	}
 	return nil
+}
+
+// clampJobFields bounds the free-text fields to their caps. Clamping (not
+// rejecting) keeps untrusted LLM output and over-long input within limits without
+// breaking edits to rows that predate the caps.
+func clampJobFields(j *Job) {
+	j.Empresa = clampRunes(j.Empresa, maxEmpresa)
+	j.Localizacao = clampRunes(j.Localizacao, maxLocalizacao)
+	j.Senioridade = clampRunes(j.Senioridade, maxSenioridade)
+	j.Resumo = clampRunes(j.Resumo, maxResumo)
+}
+
+// clampRunes truncates s to at most n runes (multibyte-safe).
+func clampRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n])
 }
 
 func validModelo(m Modelo) bool {

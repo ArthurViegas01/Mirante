@@ -15,6 +15,14 @@ type Config struct {
 	HTTPAddr  string
 	WebOrigin string
 
+	// TrustedProxy gates trust in the real-client-IP header. It must be true only
+	// when a trusted reverse proxy (Railway/Fly edge) sits in front and overwrites
+	// RealIPHeader; otherwise a client could forge the header and dodge per-IP rate
+	// limits. RealIPHeader is the proxy-controlled header carrying the client IP
+	// (Railway: X-Envoy-External-Address; Fly: Fly-Client-IP).
+	TrustedProxy bool
+	RealIPHeader string
+
 	DatabaseURL   string
 	DatabaseToken string
 
@@ -24,8 +32,6 @@ type Config struct {
 	OwnerEmail    string
 	OwnerPassword string
 	OwnerHash     string
-
-	SecretKey string
 
 	// E-mail (optional). The password-reset flow uses Resend (HTTP API) when
 	// ResendAPIKey is set, else SMTP when SMTPHost is set, else logs the link.
@@ -77,13 +83,14 @@ func Load() (Config, error) {
 		AppEnv:          env("APP_ENV", "development"),
 		HTTPAddr:        httpAddr(),
 		WebOrigin:       env("WEB_ORIGIN", "http://localhost:5173"),
+		TrustedProxy:    env("TRUSTED_PROXY", "false") == "true",
+		RealIPHeader:    env("TRUSTED_PROXY_HEADER", "X-Envoy-External-Address"),
 		DatabaseURL:     env("DATABASE_URL", "file:./data/mirante.db"),
 		DatabaseToken:   env("DATABASE_AUTH_TOKEN", ""),
 		SessionCookie:   env("SESSION_COOKIE_NAME", "mirante_session"),
 		OwnerEmail:      env("OWNER_EMAIL", ""),
 		OwnerPassword:   env("OWNER_PASSWORD", ""),
 		OwnerHash:       env("OWNER_PASSWORD_HASH", ""),
-		SecretKey:       env("APP_SECRET_KEY", ""),
 		ResendAPIKey:    env("RESEND_API_KEY", ""),
 		SMTPHost:        env("SMTP_HOST", ""),
 		SMTPUsername:    env("SMTP_USERNAME", ""),
@@ -171,9 +178,6 @@ func Load() (Config, error) {
 	c.IntakeMinScore = minScore
 
 	if c.IsProd() {
-		if c.SecretKey == "" {
-			return Config{}, errors.New("APP_SECRET_KEY is required in production")
-		}
 		if c.WebOrigin == "" {
 			return Config{}, errors.New("WEB_ORIGIN is required in production")
 		}

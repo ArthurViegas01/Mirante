@@ -83,10 +83,22 @@ func run() error {
 		log.Info("no owner configured — the instance will be claimed via first-run signup")
 	}
 
+	// Trust the real-client-IP header only when a trusted proxy fronts the app
+	// (TRUSTED_PROXY=true on Railway/Fly). Empty header = ignore proxy headers so a
+	// directly-exposed instance can't be spoofed past the per-IP limits (F4).
+	trustedHeader := ""
+	if cfg.TrustedProxy {
+		trustedHeader = cfg.RealIPHeader
+	} else if cfg.IsProd() {
+		log.Warn("TRUSTED_PROXY is false in production — per-IP rate limits will key on the " +
+			"edge proxy address (one shared bucket for all clients). Set TRUSTED_PROXY=true behind Railway/Fly.")
+	}
+
 	authH := httpserver.NewAuthHandlers(authSvc, httpserver.AuthConfig{
 		CookieName:    cfg.SessionCookie,
 		Secure:        cfg.IsProd(),
 		AllowedOrigin: cfg.WebOrigin,
+		TrustedHeader: trustedHeader,
 	})
 
 	mux := http.NewServeMux()
@@ -223,7 +235,7 @@ func run() error {
 		httpserver.Recover(log),
 		httpserver.SecurityHeaders(cfg.IsProd()),
 		httpserver.CORS(cfg.WebOrigin),
-		httpserver.RateLimit(ipLimiter),
+		httpserver.RateLimit(ipLimiter, trustedHeader),
 	)
 
 	// Outermost: an OTel server span per request (extracts trace context first;
@@ -235,6 +247,10 @@ func run() error {
 		Addr:              cfg.HTTPAddr,
 		Handler:           traced,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,  // headers + body (slow-body cap)
+		IdleTimeout:       120 * time.Second, // idle keep-alive cap
+		// WriteTimeout is omitted on purpose: /api/stream/monitor is a long-lived SSE
+		// response and a write deadline would kill the stream.
 	}
 
 	// Background: sweep expired sessions hourly until the context is cancelled.

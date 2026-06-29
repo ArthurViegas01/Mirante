@@ -62,7 +62,7 @@ func serve(t *testing.T, bootstrap bool) (string, *http.Client) {
 		Recover(slog.New(slog.NewTextHandler(io.Discard, nil))),
 		SecurityHeaders(false),
 		CORS(testOrigin),
-		RateLimit(ratelimit.New(240, time.Minute)),
+		RateLimit(ratelimit.New(240, time.Minute), ""),
 	)
 
 	srv := httptest.NewServer(handler)
